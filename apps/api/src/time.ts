@@ -1,7 +1,7 @@
 import { DateTime, Duration } from 'luxon';
 import { config } from './config.js';
 
-export const APP_ZONE = 'Africa/Mauritius';
+export const APP_ZONE = 'Indian/Mauritius';
 
 export function nowUtc(): DateTime {
   return DateTime.utc();

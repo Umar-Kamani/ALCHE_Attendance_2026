@@ -40,6 +40,8 @@ export const CreateEventBodySchema = z.object({
   direction: DirectionSchema.optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(),
   note: z.string().trim().max(500).optional().nullable(),
+  hrEdit: z.boolean().optional(),
+  reason: z.string().trim().max(1000).optional().nullable(),
 });
 
 export const CreateEventResponseSchema = z.object({
@@ -101,6 +103,8 @@ export const AttendanceResponseSchema = z.object({
   meta: PaginationMetaSchema,
 });
 
+export const MonthQuerySchema = z.object({ month: LocalMonthSchema });
+
 export const MonthAttendanceResponseSchema = z.object({
   employee: z.object({
     id: UuidSchema,
@@ -115,11 +119,22 @@ export const MonthAttendanceResponseSchema = z.object({
   events: z.array(AttendanceEventSchema),
 });
 
+export const AttendanceExportQuerySchema = z.object({
+  from: LocalDateSchema,
+  to: LocalDateSchema,
+  department: z.string().trim().max(160).optional(),
+  category: EmployeeCategorySchema.optional(),
+  status: AttendanceStatusSchema.optional(),
+});
+
 export const EventExportQuerySchema = z.object({
   from: LocalDateSchema,
   to: LocalDateSchema,
   employeeId: UuidSchema.optional(),
 });
+
+export type AttendanceExportQuery = z.infer<typeof AttendanceExportQuerySchema>;
+export type EventExportQuery = z.infer<typeof EventExportQuerySchema>;
 
 export const KioskSearchQuerySchema = z.object({
   q: z.string().trim().min(1).max(160),
@@ -184,6 +199,18 @@ export const KioskSearchResponseSchema = z.object({
   students: z.array(KioskStudentResultSchema),
   guests: z.array(KioskGuestResultSchema),
 });
+export type KioskSearchResponse = z.infer<typeof KioskSearchResponseSchema>;
+export type KioskEmployeeResult = z.infer<typeof KioskEmployeeResultSchema>;
+export type KioskStudentResult = z.infer<typeof KioskStudentResultSchema>;
+export type KioskGuestResult = z.infer<typeof KioskGuestResultSchema>;
+export type KioskVehicle = z.infer<typeof KioskVehicleSchema>;
+export type KioskActivityItem = z.infer<typeof KioskActivityItemSchema>;
+export type KioskActivityResponse = z.infer<typeof KioskActivityResponseSchema>;
+export type AttendanceResponse = z.infer<typeof AttendanceResponseSchema>;
+export type AttendanceTotals = z.infer<typeof AttendanceTotalsSchema>;
+export type MonthAttendanceResponse = z.infer<typeof MonthAttendanceResponseSchema>;
+export type CreateEventResponse = z.infer<typeof CreateEventResponseSchema>;
+export type EmployeeRecentEventsResponse = z.infer<typeof EmployeeRecentEventsResponseSchema>;
 
 export const KioskActivityItemSchema = z.object({
   id: UuidSchema,
@@ -226,5 +253,9 @@ export const HrVoidEventBodySchema = z.object({
 export const EventMutationResponseSchema = z.object({
   event: AttendanceEventSchema,
   supersededEventId: UuidSchema.nullable(),
-  success: SuccessSchema,
+  success: z.literal(true),
+});
+
+export const RecentEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(30),
 });
