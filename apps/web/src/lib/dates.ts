@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 
-export const APP_ZONE = 'Africa/Mauritius';
+export const APP_ZONE = 'Indian/Mauritius';
 
 export function formatTime(value: string | null | undefined): string {
   if (!value) return '—';
