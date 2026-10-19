@@ -28,10 +28,13 @@ export default defineConfig({
     sourcemap: false,
   },
   test: {
-    environment: 'jsdom',
+    environment: 'happy-dom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
     css: true,
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    fileParallelism: false,
   },
 });

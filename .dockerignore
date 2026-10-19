@@ -8,3 +8,5 @@ backups
 playwright-report
 test-results
 coverage
+**/*.tsbuildinfo
+*.tsbuildinfo

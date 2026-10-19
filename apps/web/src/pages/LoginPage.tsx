@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import type { LoginResponse } from '@alche/shared';
+import { LoginBodySchema, type LoginResponse } from '@alche/shared';
 import { ApiError, apiFetch, setCsrfToken } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { Brand } from '../components/Brand';
@@ -50,6 +50,17 @@ export function LoginPage() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     setFieldErrors({});
+    const parsed = LoginBodySchema.safeParse({ username, password });
+    if (!parsed.success) {
+      const errors: Record<string, string[]> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path.join('.') || '_root';
+        errors[key] ??= [];
+        errors[key].push(issue.message);
+      }
+      setFieldErrors(errors);
+      return;
+    }
     mutation.mutate();
   };
 

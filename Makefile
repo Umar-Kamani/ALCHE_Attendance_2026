@@ -25,6 +25,9 @@ test-web:
 	$(TEST_COMPOSE) --profile test run --rm test-web
 
 e2e:
+	$(COMPOSE) up -d --build
+	$(COMPOSE) exec app node dist/seed.js
+	$(COMPOSE) exec app node dist/e2e-setup.js
 	pnpm exec playwright test
 
 seed-demo:

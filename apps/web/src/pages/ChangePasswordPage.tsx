@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { ChangePasswordBodySchema } from '@alche/shared';
 import { ApiError, apiFetch } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { Brand } from '../components/Brand';
@@ -31,8 +32,9 @@ export function ChangePasswordPage() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     setLocalError(null);
-    if (newPassword.length < 12) {
-      setLocalError('Use at least 12 characters for the new password.');
+    const parsed = ChangePasswordBodySchema.safeParse({ currentPassword, newPassword });
+    if (!parsed.success) {
+      setLocalError(parsed.error.issues[0]?.message ?? 'Check the password fields.');
       return;
     }
     if (newPassword !== confirm) {

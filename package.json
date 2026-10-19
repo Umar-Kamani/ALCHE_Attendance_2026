@@ -13,6 +13,7 @@
     "test:api": "pnpm --filter @alche/api test",
     "test:web": "pnpm --filter @alche/web test",
     "e2e": "playwright test",
+    "e2e:setup": "pnpm --filter @alche/api e2e:setup",
     "typecheck": "pnpm -r typecheck",
     "format:check": "prettier --check .",
     "format": "prettier --write ."

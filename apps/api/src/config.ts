@@ -45,7 +45,7 @@ export const config = {
   sessionAbsoluteMs: 12 * 60 * 60_000,
   cookieName: 'alche_session',
   csrfCookieName: 'alche_csrf',
-  timezone: 'Africa/Mauritius',
+  timezone: 'Indian/Mauritius',
   adminPasswordIsDefault: env.ADMIN_INITIAL_PASSWORD === 'ChangeMe-ALCHE-2026!',
   publicDir: resolve(process.cwd(), existsSync(resolve(process.cwd(), 'public')) ? 'public' : '../web/dist'),
   uploadLimitBytes: 4 * 1024 * 1024,

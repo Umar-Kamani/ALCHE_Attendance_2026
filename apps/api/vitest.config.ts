@@ -2,8 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ??
-  process.env.DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:55432/alche_test?schema=public';
+  'postgresql://alche:alche@127.0.0.1:5432/alche_test?schema=public';
 
 export default defineConfig({
   test: {

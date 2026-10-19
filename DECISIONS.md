@@ -22,6 +22,7 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 
 - **Overnight attribution:** an IN→OUT pair that crosses midnight belongs to the local date of the IN. The closing OUT is not reported as `MISSING_IN` on the next day. `OVERNIGHT` is set on the entry-date row.
 - **Derivation source of truth:** one pure function computes status, span, net hours, visits, amended state and flags. No derived attendance values are stored.
+- **Time zone identifier:** the brief’s `Africa/Mauritius` is not a valid IANA zone. The app uses the real zone, `Indian/Mauritius` (UTC+4), everywhere while preserving the required local calendar date behaviour.
 - **Kiosk direction:** the UI resolves and sends the inferred direction so a second tap cannot turn a double-submit into the opposite event. The server still infers direction when omitted and applies the 120-second duplicate guard.
 - **Undo:** only the current user’s own gate event, within five minutes. Undo is a soft void, audited as `gate_undo`.
 - **Day flags:** `NO_EXIT` is added to historical `ON_SITE` rows; the current day is simply on site. `DUPLICATE_SUSPECT` requires an amended/day-edited context per the brief.
@@ -75,3 +76,20 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 - **Focus:** global 2px Monday Violet focus ring at 2px offset.
 - **No external assets:** Poppins is bundled from `@fontsource/poppins`; there is no runtime font request or CDN.
 - **No marketing page:** the app shell and operational layouts only.
+- **Design-system self-test:** `apps/web/tests/design.test.ts` walks all of `apps/web/src` and fails if any raw hex/rgb/hsl appears outside `styles/theme.css`; Playwright additionally checks the computed button, card and status-pill values.
+
+## Additional implementation decisions
+
+- **One active session per holder:** in addition to the bay and vehicle partial unique indexes, the allocation service refuses a second active session for any vehicle belonging to the same employee, student or guest. This expresses the brief’s holder rule without storing a duplicated holder key on sessions.
+- **HR direct events:** `POST /events` accepts `hrEdit=true` and a mandatory reason for HR. It writes `source='hr_edit'`; the kiosk path never sets this flag and continues to write `source='gate'`.
+- **Login throttling:** the per-IP limit is 100 attempts per 15 minutes. The precise anti-brute-force control remains the per-username DB counter that locks after five failures. A 10-per-IP limit would lock out a shared gate PC after routine successful sign-ins.
+- **Guest host filter and filtered export:** the register filters by host and status, and those filters are passed to the guest CSV export rather than exporting the unfiltered range.
+- **Demo accounts:** `seed-demo` creates `gate.demo` and `dean.demo` with randomly generated one-time passwords printed to the terminal; it does not reset an existing demo password. The E2E accounts (`e2e.security`, `e2e.hr`, `e2e.dean`) are only created by the explicit E2E fixture command and use a fixed test-only password.
+- **E2E visual isolation:** visual fixtures live in a separate `VISUAL` area with `Z-` codes, so their occupancy does not interfere with normal auto-assignment in the operational areas. Visual snapshots hide live activity/count/badge regions that necessarily change between runs; all static layout, colour, type and component geometry is captured.
+- **Web test environment:** Vitest + React Testing Library use `happy-dom`. Both jsdom 26 and 28 failed to start workers under Node 22.23 in this WSL environment; happy-dom runs the same RTL interactions without changing production code.
+- **Test database default:** API tests create and migrate `alche_test` at `postgresql://alche:alche@127.0.0.1:5432/alche_test`; `TEST_DATABASE_URL` overrides it. Compose publishes PostgreSQL on loopback (`127.0.0.1:5432`) to support this.
+- **Seed future-time guard:** demo events are filtered to “not later than now” so the seeded day never contains future OUT events that would make the kiosk’s inferred direction wrong.
+- **Production packaging:** the image uses a Prisma deploy bundle with the generated client and the Prisma CLI retained in production dependencies, so `migrate deploy` works as the non-root runtime user.
+- **No application raw SQL:** health uses a Prisma count rather than `SELECT 1`. Raw SQL is confined to migrations and test setup.
+- **Font subsets:** `@fontsource/poppins` bundles all its available subsets; browsers only fetch the subset they need and no network request is made.
+- **Formatting:** no custom formatting on guest phone/ID fields beyond trimming; they are free-text operational data.

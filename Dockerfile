@@ -8,7 +8,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
@@ -16,8 +16,12 @@ RUN pnpm fetch
 
 FROM toolchain AS build
 COPY . .
-RUN pnpm install --offline --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prefer-offline \
+    && mkdir -p apps/api/node_modules/@alche apps/web/node_modules/@alche \
+    && ln -sfn /app/packages/shared apps/api/node_modules/@alche/shared \
+    && ln -sfn /app/packages/shared apps/web/node_modules/@alche/shared
 RUN pnpm --filter @alche/shared build \
+    && pnpm --filter @alche/api prisma:generate \
     && pnpm --filter @alche/web build \
     && pnpm --filter @alche/api build
 

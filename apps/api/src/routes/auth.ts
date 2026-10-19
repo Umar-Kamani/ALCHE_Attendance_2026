@@ -48,7 +48,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       config: {
         rateLimit: {
-          max: config.isTest ? 1000 : 10,
+          // The per-username lockout is the precise control (5 failures). This
+          // IP limit only blunts distributed hammering and must not throttle a
+          // shared gate PC where officers sign in successfully.
+          max: config.isTest ? 1000 : 100,
           timeWindow: '15 minutes',
         },
       },

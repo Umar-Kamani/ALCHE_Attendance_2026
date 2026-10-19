@@ -17,7 +17,7 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
   typed.get('/healthz', { schema: { response: { 200: HealthSchema } } }, async () => {
     let db = true;
     try {
-      await prisma.$queryRaw`SELECT 1`;
+      await prisma.user.count();
     } catch {
       db = false;
     }
