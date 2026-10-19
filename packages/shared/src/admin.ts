@@ -56,6 +56,9 @@ export const UserAdminListResponseSchema = z.object({
   meta: PaginationMetaSchema,
 });
 
+export type UserAdminListResponse = z.infer<typeof UserAdminListResponseSchema>;
+export type OnCampusResponse = z.infer<typeof OnCampusResponseSchema>;
+
 export const DashboardQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -70,6 +73,13 @@ export const DashboardStatsSchema = z.object({
     missingIn: z.number().int(),
     absent: z.number().int(),
     onCampusNow: z.number().int(),
+    averageSpanHours: z.number().nullable(),
+  }),
+  month: z.object({
+    present: z.number().int(),
+    onSite: z.number().int(),
+    missingIn: z.number().int(),
+    absent: z.number().int(),
     averageSpanHours: z.number().nullable(),
   }),
   guests: z.object({

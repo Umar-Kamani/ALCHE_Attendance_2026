@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Role } from '@alche/shared';
 import { useAuth } from '../auth/AuthProvider';
 import { Brand } from './Brand';
@@ -87,7 +87,7 @@ const ROLE_LABEL: Record<Role, string> = {
   DEAN: 'Dean — read only',
 };
 
-function SidebarLink({ item }: { item: NavItem }) {
+function SidebarLink({ item, badge }: { item: NavItem; badge?: number }) {
   return (
     <NavLink
       to={item.to}
@@ -97,9 +97,18 @@ function SidebarLink({ item }: { item: NavItem }) {
           isActive ? 'bg-periwinkle text-ink' : 'text-slate hover:bg-cloud hover:text-ink',
         )
       }
+      aria-label={badge ? `${item.label}, ${badge} open` : item.label}
     >
       {item.icon}
       <span className="truncate">{item.label}</span>
+      {badge ? (
+        <span
+          className="ml-auto inline-flex min-w-6 items-center justify-center rounded-md bg-monday-violet px-1.5 py-0.5 text-caption font-medium text-snow"
+          data-testid="ticket-badge"
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
@@ -110,6 +119,23 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const ticketNotifications = useQuery({
+    queryKey: ['tickets', 'notifications'],
+    queryFn: () =>
+      apiFetch<{ openCount: number; items: Array<{ status: string }> }>('/tickets?page=1'),
+    enabled: user?.role === 'HR' || user?.role === 'SECURITY',
+    refetchInterval: 60_000,
+  });
+
+  const ticketBadge =
+    user?.role === 'HR'
+      ? ticketNotifications.data?.openCount
+      : user?.role === 'SECURITY'
+        ? ticketNotifications.data?.items.filter((ticket) =>
+            ['approved', 'applied', 'rejected'].includes(ticket.status),
+          ).length
+        : undefined;
 
   const logout = useMutation({
     mutationFn: () => apiFetch<{ success: true }>('/auth/logout', { method: 'POST' }),
@@ -195,7 +221,11 @@ export function AppShell() {
         <aside className="sticky top-[72px] hidden h-[calc(100vh-72px)] w-[240px] shrink-0 overflow-y-auto border-r border-mist bg-snow p-4 xl:block">
           <nav aria-label="Main navigation" className="space-y-1">
             {items.map((item) => (
-              <SidebarLink key={item.to} item={item} />
+              <SidebarLink
+                key={item.to}
+                item={item}
+                badge={item.to === '/tickets' ? ticketBadge : undefined}
+              />
             ))}
           </nav>
           <div className="mt-8 rounded-3xl bg-cloud p-4">
