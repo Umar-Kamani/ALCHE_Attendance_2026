@@ -9,7 +9,21 @@ import { LoginPage } from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
+import { KioskPage } from './pages/KioskPage';
+import { AttendancePage } from './pages/AttendancePage';
+import { EmployeeAttendancePage } from './pages/EmployeeAttendancePage';
+import { TicketsPage } from './pages/TicketsPage';
+import { VehiclesPage } from './pages/VehiclesPage';
+import { GuestsPage } from './pages/GuestsPage';
+import { ParkingBoardPage } from './pages/ParkingBoardPage';
+import { ParkingBaysPage } from './pages/ParkingBaysPage';
+import { ParkingHistoryPage } from './pages/ParkingHistoryPage';
+import { EmployeesPage } from './pages/EmployeesPage';
+import { StudentsPage } from './pages/StudentsPage';
+import { UsersPage } from './pages/UsersPage';
+import { AuditPage } from './pages/AuditPage';
+import { OnCampusPage } from './pages/OnCampusPage';
+import { DashboardPage } from './pages/DashboardPage';
 
 export function App() {
   const queryClient = useQueryClient();
@@ -35,74 +49,29 @@ export function App() {
 
       <Route element={<ProtectedRoute roles={['SECURITY', 'HR']} />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/kiosk"
-            element={<PlaceholderPage title="Gate kiosk" description="Staff entry and exit." />}
-          />
-          <Route
-            path="/on-campus"
-            element={<PlaceholderPage title="On campus now" description="Live campus occupancy." />}
-          />
-          <Route
-            path="/guests"
-            element={<PlaceholderPage title="Guest register" description="Visits and expected arrivals." />}
-          />
-          <Route
-            path="/parking"
-            element={<PlaceholderPage title="Parking board" description="Live bay occupancy." />}
-          />
-          <Route
-            path="/parking/bays"
-            element={<PlaceholderPage title="Bay inventory" description="Areas and bays." />}
-          />
-          <Route
-            path="/parking/history"
-            element={<PlaceholderPage title="Parking history" description="Occupancy and dwell." />}
-          />
-          <Route
-            path="/vehicles"
-            element={<PlaceholderPage title="Vehicles" description="Registered campus vehicles." />}
-          />
-          <Route
-            path="/tickets"
-            element={<PlaceholderPage title="Amendment tickets" description="Attendance corrections." />}
-          />
+          <Route path="/kiosk" element={<KioskPage />} />
+          <Route path="/on-campus" element={<OnCampusPage />} />
+          <Route path="/guests" element={<GuestsPage />} />
+          <Route path="/parking" element={<ParkingBoardPage />} />
+          <Route path="/parking/bays" element={<ParkingBaysPage />} />
+          <Route path="/parking/history" element={<ParkingHistoryPage />} />
+          <Route path="/vehicles" element={<VehiclesPage />} />
+          <Route path="/tickets" element={<TicketsPage />} />
 
           <Route element={<ProtectedRoute roles={['HR']} />}>
-            <Route
-              path="/attendance"
-              element={<PlaceholderPage title="Attendance" description="Daily attendance records." />}
-            />
-            <Route
-              path="/attendance/:employeeId"
-              element={<PlaceholderPage title="Employee attendance" description="Month calendar." />}
-            />
-            <Route
-              path="/employees"
-              element={<PlaceholderPage title="Employees" description="Staff directory and import." />}
-            />
-            <Route
-              path="/students"
-              element={<PlaceholderPage title="Students" description="Parking eligibility directory." />}
-            />
-            <Route
-              path="/users"
-              element={<PlaceholderPage title="Users" description="Accounts and roles." />}
-            />
-            <Route
-              path="/audit"
-              element={<PlaceholderPage title="Audit log" description="Append-only activity record." />}
-            />
+            <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/attendance/:employeeId" element={<EmployeeAttendancePage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/students" element={<StudentsPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/audit" element={<AuditPage />} />
           </Route>
         </Route>
       </Route>
 
       <Route element={<ProtectedRoute roles={['DEAN']} />}>
         <Route element={<AppShell />}>
-          <Route
-            path="/dashboard"
-            element={<PlaceholderPage title="Campus dashboard" description="Read-only operational statistics." />}
-          />
+          <Route path="/dashboard" element={<DashboardPage />} />
         </Route>
       </Route>
 

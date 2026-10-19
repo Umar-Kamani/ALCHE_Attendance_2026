@@ -68,6 +68,23 @@ export function registerErrorHandler(app: FastifyInstance): void {
       });
     }
 
+    if ('validation' in error && Array.isArray(error.validation) && error.validation.length > 0) {
+      const details: Record<string, string[]> = {};
+      for (const issue of error.validation) {
+        const path = String((issue as { instancePath?: string }).instancePath ?? '').replace(/^\//, '');
+        const key = path || '_root';
+        details[key] ??= [];
+        details[key].push((issue as { message?: string }).message ?? 'Invalid value');
+      }
+      return reply.status(422).send({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Please check the highlighted fields.',
+          details,
+        },
+      });
+    }
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         return reply.status(409).send({

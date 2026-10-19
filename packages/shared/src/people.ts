@@ -91,6 +91,10 @@ export const CreateStudentBodySchema = z.object({
 
 export const UpdateStudentBodySchema = CreateStudentBodySchema.partial();
 
+export type EmployeeListResponse = z.infer<typeof EmployeeListResponseSchema>;
+export type StudentListResponse = z.infer<typeof StudentListResponseSchema>;
+export type ImportBatchSummary = z.infer<typeof ImportBatchSummarySchema>;
+
 export const ImportQuerySchema = z.object({
   dryRun: QueryBooleanSchema,
   skipInvalid: QueryBooleanSchema,
