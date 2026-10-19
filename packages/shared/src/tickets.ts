@@ -73,5 +73,7 @@ export const TicketResponseSchema = z.object({ ticket: TicketSchema });
 export const TicketActionResponseSchema = z.object({
   ticket: TicketSchema,
   appliedEventId: UuidSchema.nullable(),
-  success: SuccessSchema,
+  success: z.literal(true),
 });
+export type TicketListResponse = z.infer<typeof TicketListResponseSchema>;
+export type TicketActionResponse = z.infer<typeof TicketActionResponseSchema>;
