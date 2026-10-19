@@ -1,0 +1,11 @@
+﻿employee_code,first_name,last_name,email,phone,job_title,department,category,active
+ALCHE001,Nadia,Bossy,nadia.bossy@alche.ac.mu,+230 5712 3401,Head of Administration,Administration,staff,true
+ALCHE002,Priya,Ramgoolam,priya.ramgoolam@alche.ac.mu,+230 5712 3402,Finance Officer,Finance,staff,true
+ALCHE003,Vikash,Bundhoo,vikash.bundhoo@alche.ac.mu,+230 5712 3403,Facilities Coordinator,Facilities,staff,true
+ALCHE004,Marie-Claire,L'Espérance,marie.lesperance@alche.ac.mu,+230 5712 3404,Student Affairs Officer,Student Affairs,staff,true
+ALCHE005,Jean-Noël,Ah-Koon,jean.ahkoon@alche.ac.mu,+230 5712 3405,IT Support Engineer,Technology,staff,true
+ALCHE006,Kavita,Seenauth,kavita.seenauth@alche.ac.mu,+230 5712 3406,Registrar,Academic Affairs,staff,true
+ALCHE007,Mohammad,Sookun,mohammad.sookun@alche.ac.mu,+230 5712 3407,Maintenance Technician,Facilities,contractor,true
+ALCHE008,Anne-Marie,Cheung,anne.cheung@alche.ac.mu,+230 5712 3408,Communications Lead,Communications,staff,true
+ALCHE009,Dinesh,Gopaul,dinesh.gopaul@alche.ac.mu,+230 5712 3409,Security Supervisor,Security,staff,true
+ALCHE010,Fatima,Hossen,fatima.hossen@alche.ac.mu,+230 5712 3410,Library Assistant,Library,staff,true

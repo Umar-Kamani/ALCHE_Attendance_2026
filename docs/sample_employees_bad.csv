@@ -1,0 +1,11 @@
+employee_code,first_name,last_name,email,phone,job_title,department,category,active
+A,Missing,Code,missing.code@alche.ac.mu,+230 5700 0001,Analyst,Administration,staff,true
+ALCHE020,,NoFirst,no.first@alche.ac.mu,+230 5700 0002,Analyst,Administration,staff,true
+ALCHE021,Bad,Email,not-an-email,+230 5700 0003,Analyst,Administration,staff,true
+ALCHE022,Duplicate,Code,duplicate.one@alche.ac.mu,+230 5700 0004,Analyst,Administration,staff,true
+ALCHE022,Duplicate,Again,duplicate.two@alche.ac.mu,+230 5700 0005,Analyst,Administration,staff,true
+ALCHE023,No,Department,no.dept@alche.ac.mu,+230 5700 0006,Analyst,,staff,true
+ALCHE024,Same,Email,shared.email@alche.ac.mu,+230 5700 0007,Analyst,Administration,staff,true
+ALCHE025,Same,EmailTwo,shared.email@alche.ac.mu,+230 5700 0008,Analyst,Administration,staff,true
+ALCHE026,Bad,Category,bad.category@alche.ac.mu,+230 5700 0009,Analyst,Administration,volunteer,true
+ALCHE027,Bad,Active,bad.active@alche.ac.mu,+230 5700 0010,Analyst,Administration,staff,perhaps

@@ -1,0 +1,320 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  username           String    @unique @db.Citext
+  passwordHash       String
+  displayName        String
+  role               String
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  failedLoginCount   Int       @default(0)
+  lastFailedAt       DateTime? @db.Timestamptz(3)
+  lockedUntil        DateTime? @db.Timestamptz(3)
+  lastLoginAt        DateTime? @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  sessions        Session[]
+  eventsRecorded  Event[]         @relation("RecordedEvents")
+  eventsVoided    Event[]         @relation("VoidedEvents")
+  visitsCheckedIn GuestVisit[]    @relation("VisitCheckedInBy")
+  visitsCheckedOut GuestVisit[]   @relation("VisitCheckedOutBy")
+  sessionsAllocated ParkingSession[] @relation("SessionAllocatedBy")
+  sessionsEnded   ParkingSession[] @relation("SessionEndedBy")
+  ticketsRaised   Ticket[]        @relation("TicketRaisedBy")
+  ticketsReviewed Ticket[]        @relation("TicketReviewedBy")
+  importBatches   ImportBatch[]
+  auditLogs       AuditLog[]
+}
+
+model Session {
+  id               String   @id @default(uuid()) @db.Uuid
+  tokenHash        String   @unique
+  userId           String   @db.Uuid
+  ip               String?
+  userAgent        String?
+  lastSeenAt       DateTime @db.Timestamptz(3)
+  absoluteExpiresAt DateTime @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([absoluteExpiresAt])
+}
+
+model Employee {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique @db.Citext
+  firstName     String
+  lastName      String
+  email         String?  @unique @db.Citext
+  phone         String?
+  department    String
+  jobTitle      String?
+  category      String   @default("staff")
+  active        Boolean  @default(true)
+  importBatchId String?  @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  importBatch ImportBatch?  @relation(fields: [importBatchId], references: [id], onDelete: Restrict)
+  events      Event[]
+  guestVisits GuestVisit[]
+  vehicles    Vehicle[]
+  tickets     Ticket[]
+
+  @@index([department])
+  @@index([active])
+}
+
+model Student {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @unique @db.Citext
+  firstName String
+  lastName  String
+  email     String?  @unique @db.Citext
+  programme String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  vehicles Vehicle[]
+
+  @@index([active])
+}
+
+model Guest {
+  id        String   @id @default(uuid()) @db.Uuid
+  fullName  String
+  phone     String?
+  idNumber  String?
+  company   String?
+  email     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  visits   GuestVisit[]
+  vehicles Vehicle[]
+
+  @@index([active])
+}
+
+model GuestVisit {
+  id             String    @id @default(uuid()) @db.Uuid
+  guestId        String    @db.Uuid
+  hostEmployeeId String    @db.Uuid
+  vehicleId      String?   @db.Uuid
+  purpose        String
+  expectedFrom   DateTime  @db.Timestamptz(3)
+  expectedTo     DateTime  @db.Timestamptz(3)
+  badgeNo        String?
+  checkedInAt    DateTime? @db.Timestamptz(3)
+  checkedInBy    String?   @db.Uuid
+  checkedOutAt   DateTime? @db.Timestamptz(3)
+  checkedOutBy   String?   @db.Uuid
+  status         String    @default("EXPECTED")
+  note           String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  guest        Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  hostEmployee Employee  @relation(fields: [hostEmployeeId], references: [id], onDelete: Restrict)
+  vehicle      Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  checkedInUser  User?   @relation("VisitCheckedInBy", fields: [checkedInBy], references: [id], onDelete: Restrict)
+  checkedOutUser User?   @relation("VisitCheckedOutBy", fields: [checkedOutBy], references: [id], onDelete: Restrict)
+
+  @@index([status, expectedFrom])
+  @@index([guestId])
+  @@index([hostEmployeeId])
+}
+
+model Vehicle {
+  id          String   @id @default(uuid()) @db.Uuid
+  plate       String
+  plateNorm   String
+  make        String?
+  model       String?
+  colour      String?
+  vehicleType String   @default("car")
+  active      Boolean  @default(true)
+  notes       String?
+  employeeId  String?  @db.Uuid
+  studentId   String?  @db.Uuid
+  guestId     String?  @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  student  Student?  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Restrict)
+
+  sessions    ParkingSession[]
+  guestVisits GuestVisit[]
+
+  @@index([plateNorm])
+  @@index([employeeId])
+  @@index([studentId])
+  @@index([guestId])
+}
+
+model ParkingArea {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  code      String   @unique @db.Citext
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  bays ParkingBay[]
+}
+
+model ParkingBay {
+  id        String   @id @default(uuid()) @db.Uuid
+  areaId    String   @db.Uuid
+  code      String
+  bayType   String
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  area     ParkingArea      @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  sessions ParkingSession[]
+
+  @@unique([areaId, code])
+  @@index([areaId, bayType])
+}
+
+model ParkingSession {
+  id                 String    @id @default(uuid()) @db.Uuid
+  bayId              String    @db.Uuid
+  vehicleId          String?   @db.Uuid
+  plateSnapshot      String
+  holderNameSnapshot String
+  holderCategory     String
+  startedAt          DateTime  @default(now()) @db.Timestamptz(3)
+  endedAt            DateTime? @db.Timestamptz(3)
+  allocatedBy        String    @db.Uuid
+  endedBy            String?   @db.Uuid
+  endReason          String?
+  overrideReason     String?
+  note               String?
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  bay        ParkingBay @relation(fields: [bayId], references: [id], onDelete: Restrict)
+  vehicle    Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  allocatedUser User    @relation("SessionAllocatedBy", fields: [allocatedBy], references: [id], onDelete: Restrict)
+  endedUser  User?      @relation("SessionEndedBy", fields: [endedBy], references: [id], onDelete: Restrict)
+
+  @@index([bayId, endedAt])
+  @@index([vehicleId, endedAt])
+  @@index([startedAt, endedAt])
+}
+
+model Event {
+  id             String    @id @default(uuid()) @db.Uuid
+  employeeId     String    @db.Uuid
+  occurredAt     DateTime  @db.Timestamptz(3)
+  direction      String
+  recordedBy     String    @db.Uuid
+  source         String
+  note           String?
+  supersededById String?   @db.Uuid
+  ticketId       String?   @db.Uuid
+  voidedAt       DateTime? @db.Timestamptz(3)
+  voidedBy       String?   @db.Uuid
+  voidReason     String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  recorder User     @relation("RecordedEvents", fields: [recordedBy], references: [id], onDelete: Restrict)
+  voider   User?    @relation("VoidedEvents", fields: [voidedBy], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, occurredAt])
+  @@index([occurredAt])
+  @@index([supersededById])
+}
+
+model Ticket {
+  id                  String    @id @default(uuid()) @db.Uuid
+  employeeId          String    @db.Uuid
+  targetEventId       String?   @db.Uuid
+  proposedDirection   String
+  proposedOccurredAt  DateTime  @db.Timestamptz(3)
+  reason              String
+  status              String    @default("open")
+  raisedBy            String    @db.Uuid
+  raisedAt            DateTime  @default(now()) @db.Timestamptz(3)
+  reviewedBy          String?   @db.Uuid
+  reviewedAt          DateTime? @db.Timestamptz(3)
+  hrDirection         String?
+  hrOccurredAt        DateTime? @db.Timestamptz(3)
+  appliedAt           DateTime? @db.Timestamptz(3)
+  appliedEventId      String?   @db.Uuid
+  reviewNote          String?
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  raiser   User     @relation("TicketRaisedBy", fields: [raisedBy], references: [id], onDelete: Restrict)
+  reviewer User?    @relation("TicketReviewedBy", fields: [reviewedBy], references: [id], onDelete: Restrict)
+
+  @@index([status, raisedAt])
+  @@index([raisedBy, status])
+}
+
+model ImportBatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  kind        String
+  filename    String
+  dryRun      Boolean  @default(false)
+  skipInvalid Boolean  @default(false)
+  actorUserId String   @db.Uuid
+  totalRows   Int
+  created     Int
+  updated     Int
+  skipped     Int
+  invalid     Int
+  errors      Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  actor     User       @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  employees Employee[]
+
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorUserId  String?  @db.Uuid
+  action       String
+  entityType   String
+  entityId     String?
+  before       Json?
+  after        Json?
+  reason       String?
+  ip           String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([createdAt])
+}

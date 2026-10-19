@@ -1,0 +1,30 @@
+{
+  "name": "alche-attendance",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @alche/shared build && pnpm --filter @alche/web build && pnpm --filter @alche/api build",
+    "dev": "pnpm --parallel --filter @alche/api --filter @alche/web dev",
+    "test": "pnpm test:api && pnpm test:web",
+    "test:api": "pnpm --filter @alche/api test",
+    "test:web": "pnpm --filter @alche/web test",
+    "e2e": "playwright test",
+    "typecheck": "pnpm -r typecheck",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  },
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
