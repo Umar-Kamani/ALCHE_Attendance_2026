@@ -32,6 +32,22 @@ export const VehicleSchema = z.object({
 });
 export type Vehicle = z.infer<typeof VehicleSchema>;
 
+export const VehicleHistorySchema = z.object({
+  sessionId: UuidSchema,
+  bayCode: z.string(),
+  areaName: z.string(),
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  minutes: z.number().nullable(),
+  overrideReason: z.string().nullable(),
+});
+
+export const VehicleDetailSchema = VehicleSchema.extend({
+  history: z.array(VehicleHistorySchema),
+  lastSeenAt: z.string().nullable(),
+});
+export type VehicleDetail = z.infer<typeof VehicleDetailSchema>;
+
 export const VehicleListQuerySchema = z.object({
   q: z.string().trim().max(160).optional(),
   holderKind: HolderCategorySchema.optional(),
@@ -42,6 +58,8 @@ export const VehicleListResponseSchema = z.object({
   items: z.array(VehicleSchema),
   meta: PaginationMetaSchema,
 });
+
+export type VehicleListResponse = z.infer<typeof VehicleListResponseSchema>;
 
 export const CreateVehicleBodySchema = z.object({
   plate: z.string().trim().min(2).max(20),
@@ -153,6 +171,7 @@ export const ActiveSessionSchema = z.object({
   plate: z.string(),
   holderName: z.string(),
   holderCategory: HolderCategorySchema,
+  vehicleType: z.string(),
   startedAt: z.string(),
   allocatedBy: z.string(),
   overrideReason: z.string().nullable(),
@@ -178,6 +197,10 @@ export const ParkingBoardResponseSchema = z.object({
       id: UuidSchema,
       name: z.string(),
       code: z.string(),
+      counts: z.object({
+        overall: ParkingCapacitySchema,
+        byType: z.record(z.string(), ParkingCapacitySchema),
+      }),
       bays: z.array(
         z.object({
           id: UuidSchema,
@@ -203,6 +226,8 @@ export const ParkingBoardResponseSchema = z.object({
     }),
   ),
 });
+
+export type ParkingBoardResponse = z.infer<typeof ParkingBoardResponseSchema>;
 
 export const AllocateSessionBodySchema = z
   .object({
@@ -233,7 +258,7 @@ export const ReleaseSessionBodySchema = z.object({
 export const SessionMutationResponseSchema = z.object({
   session: ActiveSessionSchema,
   releasedSessionId: UuidSchema.nullable(),
-  success: SuccessSchema,
+  success: z.literal(true),
 });
 
 export const ParkingHistoryQuerySchema = z.object({
@@ -260,6 +285,11 @@ export const ParkingHistoryResponseSchema = z.object({
     averageDwellMinutes: z.number().nullable(),
   }),
 });
+
+export type ParkingHistoryResponse = z.infer<typeof ParkingHistoryResponseSchema>;
+export type ParkingAreaListResponse = z.infer<typeof ParkingAreaListResponseSchema>;
+export type BulkBayResponse = z.infer<typeof BulkBayResponseSchema>;
+export type SessionMutationResponse = z.infer<typeof SessionMutationResponseSchema>;
 
 export const ParkingExportQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

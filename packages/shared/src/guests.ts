@@ -126,17 +126,26 @@ export const GuestVisitListResponseSchema = z.object({
   }),
 });
 
-export const CreateGuestVisitBodySchema = z.object({
-  guestId: UuidSchema.optional(),
-  guest: CreateGuestBodySchema.optional(),
-  hostEmployeeId: UuidSchema,
-  purpose: z.string().trim().min(2).max(300),
-  expectedFrom: z.string().datetime({ offset: true }),
-  expectedTo: z.string().datetime({ offset: true }),
-  badgeNo: z.string().trim().max(40).optional().nullable(),
-  note: z.string().trim().max(500).optional().nullable(),
-  vehicle: GuestVehicleInputSchema.optional().nullable(),
-});
+export const CreateGuestVisitBodySchema = z
+  .object({
+    guestId: UuidSchema.optional(),
+    guest: CreateGuestBodySchema.optional(),
+    hostEmployeeId: UuidSchema,
+    purpose: z.string().trim().min(2).max(300),
+    expectedFrom: z.string().datetime({ offset: true }),
+    expectedTo: z.string().datetime({ offset: true }),
+    badgeNo: z.string().trim().max(40).optional().nullable(),
+    note: z.string().trim().max(500).optional().nullable(),
+    vehicle: GuestVehicleInputSchema.optional().nullable(),
+  })
+  .refine((value) => Boolean(value.guestId) !== Boolean(value.guest), {
+    message: 'Provide an existing guest or the details for a new guest, not both.',
+    path: ['guestId'],
+  })
+  .refine((value) => new Date(value.expectedFrom) < new Date(value.expectedTo), {
+    message: 'The expected end must be after the expected start.',
+    path: ['expectedTo'],
+  });
 
 export const CheckInGuestVisitBodySchema = z.object({
   badgeNo: z.string().trim().max(40).optional().nullable(),
@@ -151,12 +160,24 @@ export const CheckOutGuestVisitBodySchema = z.object({
 });
 
 export const GuestVisitResponseWrapperSchema = z.object({ visit: GuestVisitSchema });
+export type GuestVisitListResponse = z.infer<typeof GuestVisitListResponseSchema>;
+export type GuestListResponse = z.infer<typeof GuestListResponseSchema>;
+export const GuestDetailResponseSchema = z.object({
+  guest: GuestSchema,
+  visits: z.array(GuestVisitSchema),
+});
+export type GuestDetailResponse = z.infer<typeof GuestDetailResponseSchema>;
+export type CreateGuestVisitBody = z.infer<typeof CreateGuestVisitBodySchema>;
+export type CheckInGuestVisitBody = z.infer<typeof CheckInGuestVisitBodySchema>;
+export type CheckOutGuestVisitBody = z.infer<typeof CheckOutGuestVisitBodySchema>;
 
 export const GuestVisitRegisterRowSchema = GuestVisitSchema;
 
 export const GuestExportQuerySchema = z.object({
   from: LocalDateSchema,
   to: LocalDateSchema,
+  host: UuidSchema.optional(),
+  status: VisitStatusSchema.optional(),
 });
 
 export const GuestDeactivateResponseSchema = SuccessSchema;
