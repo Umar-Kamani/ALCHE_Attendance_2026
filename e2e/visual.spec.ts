@@ -95,6 +95,61 @@ test.describe('visual and design fidelity', () => {
     expect(externalFontRequests).toEqual([]);
   });
 
+  test('keeps mobile spacing and the user menu usable', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/login');
+
+    const loginCard = page.locator('main .rounded-3xl').first();
+    await expect(loginCard).toBeVisible();
+    const loginPadding = await loginCard.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).paddingLeft),
+    );
+    expect(loginPadding).toBeGreaterThanOrEqual(32);
+
+    await login(page, 'e2e.hr');
+    await page.getByRole('button', { name: 'Open user menu' }).click();
+
+    const menu = page.getByRole('menu');
+    const menuBox = await menu.boundingBox();
+    expect(menuBox).not.toBeNull();
+    expect(menuBox!.width).toBeGreaterThanOrEqual(300);
+    expect(menuBox!.x).toBeGreaterThanOrEqual(8);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(382);
+
+    const menuInset = await menu.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return (
+        Number.parseFloat(style.paddingLeft) +
+        Number.parseFloat(style.paddingRight) +
+        Number.parseFloat(style.borderLeftWidth) +
+        Number.parseFloat(style.borderRightWidth)
+      );
+    });
+    const actionWidths = await menu.getByRole('menuitem').evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().width),
+    );
+    for (const actionWidth of actionWidths) {
+      expect(actionWidth).toBeCloseTo(menuBox!.width - menuInset, 0);
+    }
+
+    const bottomBar = page.getByRole('navigation', { name: 'Tablet navigation' });
+    const bottomBarMetrics = await bottomBar.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: element.getBoundingClientRect().height,
+        paddingTop: Number.parseFloat(style.paddingTop),
+        paddingRight: Number.parseFloat(style.paddingRight),
+        paddingBottom: Number.parseFloat(style.paddingBottom),
+        paddingLeft: Number.parseFloat(style.paddingLeft),
+      };
+    });
+    expect(bottomBarMetrics.height).toBeGreaterThanOrEqual(74);
+    expect(bottomBarMetrics.paddingTop).toBeGreaterThanOrEqual(4);
+    expect(bottomBarMetrics.paddingRight).toBeGreaterThanOrEqual(8);
+    expect(bottomBarMetrics.paddingBottom).toBeGreaterThanOrEqual(8);
+    expect(bottomBarMetrics.paddingLeft).toBeGreaterThanOrEqual(8);
+  });
+
   for (const viewport of [
     { width: 1366, height: 768 },
     { width: 1024, height: 768 },

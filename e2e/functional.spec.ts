@@ -132,3 +132,18 @@ test('security marks IN with parking, HR applies the amendment and exports, secu
   expect(guestCsv).toContain(plate);
   expect(guestCsv).toContain('DEPARTED');
 });
+
+test('keeps focus in an add-record dialog while typing', async ({ page }) => {
+  await login(page, 'e2e.security');
+  await page.goto('/guests');
+  await page.getByRole('button', { name: 'Check in walk-in' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'New guest' }).click();
+  const fullName = dialog.getByLabel(/Full name/);
+  await fullName.click();
+  await fullName.pressSequentially('Vera Visual', { delay: 10 });
+
+  await expect(fullName).toHaveValue('Vera Visual');
+  await expect(fullName).toBeFocused();
+});

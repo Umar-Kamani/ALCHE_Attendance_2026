@@ -65,12 +65,12 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-cloud px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-cloud px-4 py-12 sm:px-6 sm:py-16">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex justify-center">
+        <div className="mb-7 flex justify-center">
           <Brand />
         </div>
-        <Card className="p-8">
+        <Card className="p-9 sm:p-10">
           <div className="mb-6">
             <h1 className="text-heading-sm font-medium tracking-heading-sm text-ink">Sign in</h1>
             <p className="mt-1 text-body-sm text-slate">
@@ -119,7 +119,7 @@ export function LoginPage() {
             </Button>
           </form>
         </Card>
-        <p className="mt-4 text-center text-caption text-slate">
+        <p className="mt-5 text-center text-caption text-slate">
           ALCHE · African Leadership College of Higher Education · Pamplemousses
         </p>
       </div>

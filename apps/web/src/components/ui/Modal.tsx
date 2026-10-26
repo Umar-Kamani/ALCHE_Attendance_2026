@@ -30,6 +30,11 @@ export function Modal({
   size = 'md',
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -38,16 +43,19 @@ export function Modal({
     document.body.style.overflow = 'hidden';
 
     const timeout = window.setTimeout(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(
-        'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+      const firstField = panelRef.current?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])',
       );
-      first?.focus();
+      const firstControl = panelRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      (firstField ?? firstControl)?.focus();
     }, 20);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
       const focusable = Array.from(
@@ -74,7 +82,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

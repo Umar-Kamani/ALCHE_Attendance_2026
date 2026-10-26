@@ -185,18 +185,23 @@ export function AppShell() {
             {menuOpen ? (
               <div
                 role="menu"
-                className="alche-rise absolute right-0 top-12 z-50 w-64 rounded-3xl border border-mist bg-snow p-2 shadow-xl"
+                className="alche-rise absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[320px] max-w-[calc(100vw-2rem)] rounded-3xl border border-mist bg-snow p-3 shadow-xl"
               >
-                <div className="px-3 py-2">
-                  <p className="text-body-sm font-medium text-ink">{user.displayName}</p>
-                  <p className="text-caption text-slate">{user.username}</p>
-                  <p className="mt-1 text-caption text-slate">{ROLE_LABEL[user.role]}</p>
+                <div className="min-w-0 px-2 py-2">
+                  <p className="truncate text-body-sm font-medium text-ink" title={user.displayName}>
+                    {user.displayName}
+                  </p>
+                  <p className="truncate text-caption text-slate" title={user.username}>
+                    {user.username}
+                  </p>
+                  <p className="mt-1 truncate text-caption text-slate">{ROLE_LABEL[user.role]}</p>
                 </div>
+                <div className="my-2 border-t border-mist" />
                 <NavLink
                   to="/change-password"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="flex min-h-11 items-center gap-2 rounded-md px-3 text-body-sm text-slate hover:bg-cloud hover:text-ink"
+                  className="flex min-h-12 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-body-sm text-slate hover:bg-cloud hover:text-ink"
                 >
                   <UserIcon size={18} />
                   Change password
@@ -206,7 +211,7 @@ export function AppShell() {
                   role="menuitem"
                   onClick={() => logout.mutate()}
                   disabled={logout.isPending}
-                  className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-left text-body-sm text-slate hover:bg-cloud hover:text-ink"
+                  className="flex min-h-12 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-sm text-slate hover:bg-cloud hover:text-ink"
                 >
                   <LogOutIcon size={18} />
                   {logout.isPending ? 'Signing out…' : 'Sign out'}
@@ -236,7 +241,7 @@ export function AppShell() {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-24 xl:pb-0">
+        <main className="min-w-0 flex-1 pb-28 xl:pb-0">
           <div className="mx-auto w-full max-w-[1200px] p-4 sm:p-6 lg:p-8">
             <Outlet />
           </div>
@@ -245,16 +250,16 @@ export function AppShell() {
 
       <nav
         aria-label="Tablet navigation"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-snow px-1 pb-[env(safe-area-inset-bottom)] xl:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-snow px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] sm:px-4 xl:hidden"
       >
-        <div className="mx-auto flex max-w-2xl items-stretch justify-around">
+        <div className="mx-auto flex max-w-2xl items-stretch justify-around gap-0.5">
           {bottomItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 text-caption font-medium',
+                  'flex min-h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-caption font-medium',
                   isActive ? 'bg-periwinkle text-ink' : 'text-slate',
                 )
               }
@@ -267,7 +272,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setMoreOpen(true)}
-              className="flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 text-caption font-medium text-slate"
+              className="flex min-h-[64px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-caption font-medium text-slate"
             >
               <MenuIcon size={ICON_SIZE} />
               <span>More</span>
