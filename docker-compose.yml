@@ -16,6 +16,8 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
+    networks:
+      - web
 
   app:
     build:
@@ -35,6 +37,17 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app-alche-attendance-2026.rule=Host(`attendance.alu.app`)"
+      - "traefik.http.routers.app-alche-attendance-2026.service=app-alche-attendance-2026"
+      - "traefik.http.routers.app-alche-attendance-2026.tls=true"
+      - "traefik.http.routers.app-alche-attendance-2026.entrypoints=web,websecure"
+      - "traefik.http.routers.app-alche-attendance-2026.tls.certresolver=le"
+      - "traefik.http.services.app-alche-attendance-2026.loadbalancer.server.port=8000"
+
+    networks:
+      - web
 
   caddy:
     image: caddy:2.8-alpine
@@ -50,6 +63,11 @@ services:
       app:
         condition: service_healthy
     restart: unless-stopped
+
+networks: #using the traefk default network
+  web:
+    name: dockertraefk_default
+    external: true
 
 volumes:
   alche_pgdata:
