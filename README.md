@@ -49,7 +49,7 @@ With the stack running:
 make seed-demo
 ```
 
-This is idempotent and creates approximately 15 staff, 8 students, 6 guests, 14 vehicles, 2 demonstration areas with 40 typed bays, 30+ days of events, 12 active parking sessions, one approved amendment and one open ticket. It prints the one-time passwords for the demo security and dean accounts. Re-running it does not duplicate data and does not reset existing demo passwords.
+This is idempotent and creates approximately 15 staff, 6 guests, 11 vehicles, 2 demonstration areas with 40 typed bays, 30+ days of events, 9 active parking sessions, one approved amendment and one open ticket. It prints the one-time passwords for the demo security and dean accounts. Re-running it does not duplicate data and does not reset existing demo passwords.
 
 To run the automated browser checks against the demo database:
 
@@ -67,7 +67,7 @@ This starts the stack, seeds the demo data, installs the isolated E2E fixtures a
 | Role | Main work |
 |---|---|
 | **SECURITY** | Kiosk in/out with inline parking, today’s attendance, guests, vehicles, live parking board, bay inventory, parking history, raise/view own amendment tickets |
-| **HR** | Everything operational plus the employee/student directories, imports, full attendance history, employee detail and corrections, exports, user accounts, audit log; parking is read-only |
+| **HR** | Everything operational plus the employee directory, imports, full attendance history, employee detail and corrections, exports, user accounts, audit log; parking is read-only |
 | **DEAN** | Read-only aggregate dashboard: today’s snapshot, current-month totals, guest flow, parking occupancy and a 30-day attendance trend. No names, guest PII, exports or mutations |
 
 The server enforces the role matrix on every `/api/v1` route. Hiding a button is never the authorisation.
@@ -81,11 +81,12 @@ The server enforces the role matrix on every `/api/v1` route. Hiding a button is
 1. Search by name, employee code or number plate.
 2. Select the person. The current state and vehicles appear.
 3. One primary action is inferred: **Mark IN** or **Mark OUT**. A text toggle handles exceptions.
-4. If checking in and a vehicle is registered, a matching free bay is offered in the same flow. “No parking” never blocks attendance.
-5. On checkout, the toast offers **Release bay A-03**. Releasing is never silent.
-6. A double tap cannot double-log: the request is disabled while in flight, and the server rejects the same direction within 120 seconds.
-7. Undo is available only for the event the signed-in officer created, for five minutes, and is audited as `gate_undo`.
-8. If the staff member has no vehicle, **Add vehicle** registers one at the gate.
+4. **Change time** allows a Mauritius-local override for the event. The server rejects times before the employee’s latest event; parking starts or ends at the chosen time.
+5. If checking in and vehicles are registered, choose the vehicle and a free matching bay. “No parking” never blocks attendance.
+6. Marking OUT automatically releases the employee’s active parking session and confirms the released bay.
+7. A double tap cannot double-log: the request is disabled while in flight, and the server rejects the same direction within 120 seconds.
+8. Undo is available only for the event the signed-in officer created, for five minutes, and is audited as `gate_undo`.
+9. If the staff member has no vehicle, **Add vehicle** registers one at the gate.
 
 The kiosk also shows today’s activity and the current on-campus count.
 
@@ -100,7 +101,7 @@ The kiosk also shows today’s activity and the current on-campus count.
 
 ### Parking
 
-- **Parking board** groups bays by area. Every bay shows its code and a type chip (`S`, `St`, `G`, `Gen`, `Acc`, `M`); occupancy is also written in words/plates, never colour alone.
+- **Parking board** groups bays by area. Every bay shows its code and a type chip (`S`, `G`, `Gen`, `Acc`, `M`); occupancy is also written in words/plates, never colour alone.
 - Auto-assign chooses the lowest-numbered free matching bay, then falls back to `GENERAL`. It never falls into a reserved type.
 - A mismatched allocation is refused with `422` until a typed reason is entered; the session is badged as an override and the action is audited.
 - A bay and a vehicle each have at most one active session, enforced by PostgreSQL partial unique indexes. A holder also has only one active parking session across all their vehicles.

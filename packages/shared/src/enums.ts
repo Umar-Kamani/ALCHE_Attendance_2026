@@ -17,7 +17,6 @@ export type VehicleType = z.infer<typeof VehicleTypeSchema>;
 
 export const BayTypeSchema = z.enum([
   'STAFF',
-  'STUDENT',
   'GUEST',
   'GENERAL',
   'ACCESSIBLE',
@@ -27,6 +26,9 @@ export type BayType = z.infer<typeof BayTypeSchema>;
 
 export const HolderCategorySchema = z.enum(['employee', 'student', 'guest']);
 export type HolderCategory = z.infer<typeof HolderCategorySchema>;
+
+export const VehicleHolderKindSchema = z.enum(['employee', 'guest']);
+export type VehicleHolderKind = z.infer<typeof VehicleHolderKindSchema>;
 
 export const AttendanceStatusSchema = z.enum(['PRESENT', 'ON_SITE', 'MISSING_IN', 'ABSENT']);
 export type AttendanceStatus = z.infer<typeof AttendanceStatusSchema>;
@@ -51,7 +53,7 @@ export type VisitStatus = z.infer<typeof VisitStatusSchema>;
 export const TicketStatusSchema = z.enum(['open', 'approved', 'applied', 'rejected', 'withdrawn']);
 export type TicketStatus = z.infer<typeof TicketStatusSchema>;
 
-export const BayChipTypeSchema = z.enum(['S', 'St', 'G', 'Gen', 'Acc', 'M']);
+export const BayChipTypeSchema = z.enum(['S', 'G', 'Gen', 'Acc', 'M']);
 export type BayChipType = z.infer<typeof BayChipTypeSchema>;
 
 export const SessionEndReasonSchema = z.enum(['gate_release', 'relocated', 'guest_checkout', 'hr']);

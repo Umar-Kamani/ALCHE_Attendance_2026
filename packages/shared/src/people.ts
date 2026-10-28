@@ -55,44 +55,7 @@ export const CreateEmployeeBodySchema = z.object({
 
 export const UpdateEmployeeBodySchema = CreateEmployeeBodySchema.partial();
 
-export const StudentSchema = z.object({
-  id: UuidSchema,
-  studentId: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  fullName: z.string(),
-  email: z.string().nullable(),
-  programme: z.string().nullable(),
-  active: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-export type Student = z.infer<typeof StudentSchema>;
-
-export const StudentListQuerySchema = z.object({
-  q: z.string().trim().max(160).optional(),
-  includeInactive: QueryBooleanSchema,
-  page: z.coerce.number().int().min(1).default(1),
-});
-
-export const StudentListResponseSchema = z.object({
-  items: z.array(StudentSchema),
-  meta: PaginationMetaSchema,
-});
-
-export const CreateStudentBodySchema = z.object({
-  studentId: z.string().trim().min(2).max(40),
-  firstName: z.string().trim().min(1).max(120),
-  lastName: z.string().trim().min(1).max(120),
-  email: optionalEmail.optional(),
-  programme: z.string().trim().max(160).optional().nullable(),
-  active: z.boolean().default(true),
-});
-
-export const UpdateStudentBodySchema = CreateStudentBodySchema.partial();
-
 export type EmployeeListResponse = z.infer<typeof EmployeeListResponseSchema>;
-export type StudentListResponse = z.infer<typeof StudentListResponseSchema>;
 export type ImportBatchSummary = z.infer<typeof ImportBatchSummarySchema>;
 
 export const ImportQuerySchema = z.object({
@@ -116,7 +79,7 @@ export const ImportPreviewRowSchema = z.object({
 
 export const ImportBatchSummarySchema = z.object({
   id: UuidSchema,
-  kind: z.enum(['employees', 'students']),
+  kind: z.literal('employees'),
   filename: z.string(),
   dryRun: z.boolean(),
   skipInvalid: z.boolean(),

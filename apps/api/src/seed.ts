@@ -23,17 +23,6 @@ const EMPLOYEES = [
   ['ALCHE015', 'Thierry', 'Labonne', 'Facilities', 'Groundskeeper', 'contractor'],
 ] as const;
 
-const STUDENTS = [
-  ['STU2026001', 'Aisha', 'Peerboccus', 'BA International Business'],
-  ['STU2026002', 'Shivani', 'Appadoo', 'BSc Computer Science'],
-  ['STU2026003', 'Yannick', 'Lee', 'BEng Engineering'],
-  ['STU2026004', 'Thierry', 'Labonne', 'BA Social Sciences'],
-  ['STU2026005', 'Meera', 'Daby', 'BSc Data Science'],
-  ['STU2026006', 'Kenzo', 'Ah-Sam', 'BA Entrepreneurship'],
-  ['STU2026007', 'Leila', 'Ramdin', 'BSc Computer Science'],
-  ['STU2026008', 'Rohan', 'Mohith', 'BEng Engineering'],
-] as const;
-
 const GUESTS = [
   ['Élodie Tran', 'Mauritius Telecom', '+230 5700 1001', 'ID-MU-1001'],
   ['Priya Naidoo', 'Orange Business', '+230 5700 1002', 'ID-MU-1002'],
@@ -48,7 +37,7 @@ const VEHICLES: Array<{
   make: string;
   model: string;
   colour: string;
-  kind: 'employee' | 'student' | 'guest';
+  kind: 'employee' | 'guest';
   index: number;
   vehicleType: 'car' | 'motorbike' | 'van' | 'other';
 }> = [
@@ -60,9 +49,6 @@ const VEHICLES: Array<{
   { plate: 'EF 1122', make: 'Yamaha', model: 'NMAX', colour: 'Grey', kind: 'employee', index: 5, vehicleType: 'motorbike' },
   { plate: 'EF 3344', make: 'Suzuki', model: 'Swift', colour: 'White', kind: 'employee', index: 6, vehicleType: 'car' },
   { plate: 'GH 5566', make: 'Mitsubishi', model: 'L200', colour: 'White', kind: 'employee', index: 7, vehicleType: 'van' },
-  { plate: 'ST 2021', make: 'Toyota', model: 'Vitz', colour: 'Black', kind: 'student', index: 0, vehicleType: 'car' },
-  { plate: 'ST 2022', make: 'Honda', model: 'PCX', colour: 'White', kind: 'student', index: 1, vehicleType: 'motorbike' },
-  { plate: 'ST 2023', make: 'Suzuki', model: 'Alto', colour: 'Silver', kind: 'student', index: 2, vehicleType: 'car' },
   { plate: 'GU 9080', make: 'Nissan', model: 'X-Trail', colour: 'Grey', kind: 'guest', index: 0, vehicleType: 'car' },
   { plate: 'GU 9081', make: 'Toyota', model: 'Hiace', colour: 'White', kind: 'guest', index: 1, vehicleType: 'van' },
   { plate: 'GU 9082', make: 'Peugeot', model: '208', colour: 'Blue', kind: 'guest', index: 2, vehicleType: 'car' },
@@ -76,7 +62,7 @@ const AREA_BAYS: Array<{
     area: { code: 'MAIN', name: 'Main Lot' },
     bays: [
       { from: 1, to: 12, prefix: 'A-', type: 'STAFF' },
-      { from: 13, to: 20, prefix: 'A-', type: 'STUDENT' },
+      { from: 13, to: 20, prefix: 'A-', type: 'GENERAL' },
       { from: 21, to: 26, prefix: 'A-', type: 'GENERAL' },
       { from: 27, to: 28, prefix: 'A-', type: 'ACCESSIBLE' },
       { from: 29, to: 30, prefix: 'A-', type: 'MOTORBIKE' },
@@ -166,24 +152,6 @@ async function main(): Promise<void> {
     );
   }
 
-  const students = [];
-  for (const [studentId, firstName, lastName, programme] of STUDENTS) {
-    students.push(
-      await prisma.student.upsert({
-        where: { studentId },
-        update: { firstName, lastName, programme, active: true },
-        create: {
-          studentId,
-          firstName,
-          lastName,
-          programme,
-          email: `${studentId.toLowerCase()}@student.alche.ac.mu`,
-          active: true,
-        },
-      }),
-    );
-  }
-
   const guests = [];
   for (const [fullName, company, phone, idNumber] of GUESTS) {
     const existing = await prisma.guest.findFirst({ where: { fullName, company } });
@@ -232,10 +200,8 @@ async function main(): Promise<void> {
   for (const spec of VEHICLES) {
     const holder =
       spec.kind === 'employee'
-        ? { employeeId: employees[spec.index]!.id, studentId: null, guestId: null }
-        : spec.kind === 'student'
-          ? { employeeId: null, studentId: students[spec.index]!.id, guestId: null }
-          : { employeeId: null, studentId: null, guestId: guests[spec.index]!.id };
+        ? { employeeId: employees[spec.index]!.id, guestId: null }
+        : { employeeId: null, guestId: guests[spec.index]!.id };
     const plateNorm = spec.plate.toUpperCase().replace(/[\s-]/g, '');
     const existing = await prisma.vehicle.findFirst({ where: { plateNorm, active: true } });
     vehicles.push(
@@ -438,28 +404,23 @@ async function main(): Promise<void> {
     where: { note: 'seed-demo:session' },
   });
   if (seededSessions === 0) {
-    const allocations: Array<[string, string, 'employee' | 'student' | 'guest', number]> = [
+    const allocations: Array<[string, string, 'employee' | 'guest', number]> = [
       ['A-01', 'AB 1234', 'employee', 0],
       ['A-02', 'AB 5678', 'employee', 1],
       ['A-03', 'AB 9012', 'employee', 2],
       ['A-04', 'CD 3456', 'employee', 3],
       ['A-05', 'CD 7890', 'employee', 4],
       ['A-06', 'EF 1122', 'employee', 5],
-      ['A-13', 'ST 2021', 'student', 8],
-      ['A-14', 'ST 2022', 'student', 9],
-      ['A-15', 'ST 2023', 'student', 10],
-      ['B-01', 'GU 9080', 'guest', 11],
-      ['B-02', 'GU 9081', 'guest', 12],
-      ['B-03', 'GU 9082', 'guest', 13],
+      ['B-01', 'GU 9080', 'guest', 8],
+      ['B-02', 'GU 9081', 'guest', 9],
+      ['B-03', 'GU 9082', 'guest', 10],
     ];
     for (const [code, plate, category, vehicleIndex] of allocations) {
       const vehicle = vehicles[vehicleIndex]!;
       const holderName =
         category === 'employee'
           ? `${employees[vehicleIndex]!.firstName} ${employees[vehicleIndex]!.lastName}`
-          : category === 'student'
-            ? `${students[vehicleIndex - 8]!.firstName} ${students[vehicleIndex - 8]!.lastName}`
-            : guests[vehicleIndex - 11]!.fullName;
+          : guests[vehicleIndex - 8]!.fullName;
       await prisma.parkingSession.create({
         data: {
           bayId: bayIds.get(code)!,
@@ -529,7 +490,6 @@ async function main(): Promise<void> {
     entityId: null,
     after: {
       employees: employees.length,
-      students: students.length,
       guests: guests.length,
       vehicles: vehicles.length,
       bays: bayIds.size,
@@ -540,11 +500,10 @@ async function main(): Promise<void> {
 
   console.log('Demo data ready.');
   console.log(`  Employees: ${employees.length}`);
-  console.log(`  Students: ${students.length}`);
   console.log(`  Guests: ${guests.length}`);
   console.log(`  Vehicles: ${vehicles.length}`);
   console.log(`  Bays: ${bayIds.size}`);
-  console.log(`  Active parking sessions: 12`);
+  console.log(`  Active parking sessions: 9`);
   if (printedAccounts.length > 0) {
     console.log('\nOne-time demo account passwords (shown once):');
     for (const account of printedAccounts) {

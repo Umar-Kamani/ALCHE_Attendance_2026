@@ -14,7 +14,6 @@ export type SessionRecord = Prisma.ParkingSessionGetPayload<{ include: typeof SE
 
 export const CHIP: Record<BayType, BayChipType> = {
   STAFF: 'S',
-  STUDENT: 'St',
   GUEST: 'G',
   GENERAL: 'Gen',
   ACCESSIBLE: 'Acc',
@@ -23,7 +22,6 @@ export const CHIP: Record<BayType, BayChipType> = {
 
 export const BAY_LABEL: Record<BayType, string> = {
   STAFF: 'Staff',
-  STUDENT: 'Student',
   GUEST: 'Guest',
   GENERAL: 'General',
   ACCESSIBLE: 'Accessible',
@@ -72,8 +70,7 @@ export function checkEligibility(
       ? { requiresOverride: false, reason: null }
       : { requiresOverride: true, reason: 'This bay is reserved for motorbikes.' };
   }
-  const expected =
-    bayType === 'STAFF' ? 'employee' : bayType === 'STUDENT' ? 'student' : 'guest';
+  const expected = bayType === 'STAFF' ? 'employee' : 'guest';
   if (holderCategory !== expected) {
     return {
       requiresOverride: true,
@@ -90,23 +87,14 @@ export function bayNumber(code: string): number {
 
 export function vehicleHolder(vehicle: {
   employee: { id: string; firstName: string; lastName: string; active: boolean } | null;
-  student: { id: string; firstName: string; lastName: string; active: boolean } | null;
   guest: { id: string; fullName: string; active: boolean } | null;
-}): { category: 'employee' | 'student' | 'guest'; id: string; name: string; active: boolean } {
+}): { category: 'employee' | 'guest'; id: string; name: string; active: boolean } {
   if (vehicle.employee) {
     return {
       category: 'employee',
       id: vehicle.employee.id,
       name: `${vehicle.employee.firstName} ${vehicle.employee.lastName}`,
       active: vehicle.employee.active,
-    };
-  }
-  if (vehicle.student) {
-    return {
-      category: 'student',
-      id: vehicle.student.id,
-      name: `${vehicle.student.firstName} ${vehicle.student.lastName}`,
-      active: vehicle.student.active,
     };
   }
   return {
@@ -122,7 +110,6 @@ export async function vehicleForAllocation(vehicleId: string) {
     where: { id: vehicleId },
     include: {
       employee: { select: { id: true, firstName: true, lastName: true, active: true } },
-      student: { select: { id: true, firstName: true, lastName: true, active: true } },
       guest: { select: { id: true, fullName: true, active: true } },
     },
   });
@@ -145,9 +132,7 @@ export async function assertHolderNotParked(
       vehicle:
         holderCategory === 'employee'
           ? { employeeId: holderId }
-          : holderCategory === 'student'
-            ? { studentId: holderId }
-            : { guestId: holderId },
+          : { guestId: holderId },
     },
     include: { bay: { include: { area: true } } },
   });
@@ -190,13 +175,7 @@ export async function findAutoBay(
   vehicleType: string,
 ): Promise<{ id: string; code: string; bayType: BayType; areaName: string } | null> {
   const preferred: BayType =
-    vehicleType === 'motorbike'
-      ? 'MOTORBIKE'
-      : holderCategory === 'employee'
-        ? 'STAFF'
-        : holderCategory === 'student'
-          ? 'STUDENT'
-          : 'GUEST';
+    vehicleType === 'motorbike' ? 'MOTORBIKE' : holderCategory === 'employee' ? 'STAFF' : 'GUEST';
 
   const candidates = await prisma.parkingBay.findMany({
     where: {

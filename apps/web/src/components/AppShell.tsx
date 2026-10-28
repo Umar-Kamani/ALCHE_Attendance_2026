@@ -66,7 +66,6 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/parking/history', label: 'Parking history', shortLabel: 'History', icon: <HistoryIcon size={ICON_SIZE} /> },
     { to: '/vehicles', label: 'Vehicles', shortLabel: 'Vehicles', icon: <CarIcon size={ICON_SIZE} /> },
     { to: '/employees', label: 'Employees', shortLabel: 'Employees', icon: <PeopleIcon size={ICON_SIZE} /> },
-    { to: '/students', label: 'Students', shortLabel: 'Students', icon: <PeopleIcon size={ICON_SIZE} /> },
     { to: '/tickets', label: 'Amendment tickets', shortLabel: 'Tickets', icon: <TicketIcon size={ICON_SIZE} /> },
     { to: '/users', label: 'Users', shortLabel: 'Users', icon: <UserIcon size={ICON_SIZE} /> },
     { to: '/audit', label: 'Audit log', shortLabel: 'Audit', icon: <AuditIcon size={ICON_SIZE} /> },

@@ -77,22 +77,6 @@ model Employee {
   @@index([active])
 }
 
-model Student {
-  id        String   @id @default(uuid()) @db.Uuid
-  studentId String   @unique @db.Citext
-  firstName String
-  lastName  String
-  email     String?  @unique @db.Citext
-  programme String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-
-  vehicles Vehicle[]
-
-  @@index([active])
-}
-
 model Guest {
   id        String   @id @default(uuid()) @db.Uuid
   fullName  String
@@ -150,13 +134,11 @@ model Vehicle {
   active      Boolean  @default(true)
   notes       String?
   employeeId  String?  @db.Uuid
-  studentId   String?  @db.Uuid
   guestId     String?  @db.Uuid
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  student  Student?  @relation(fields: [studentId], references: [id], onDelete: Restrict)
   guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Restrict)
 
   sessions    ParkingSession[]
@@ -164,7 +146,6 @@ model Vehicle {
 
   @@index([plateNorm])
   @@index([employeeId])
-  @@index([studentId])
   @@index([guestId])
 }
 

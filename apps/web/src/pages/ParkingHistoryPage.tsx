@@ -110,7 +110,6 @@ export function ParkingHistoryPage() {
               placeholder="All types"
               options={[
                 ['STAFF', 'Staff'],
-                ['STUDENT', 'Student'],
                 ['GUEST', 'Guest'],
                 ['GENERAL', 'General'],
                 ['ACCESSIBLE', 'Accessible'],

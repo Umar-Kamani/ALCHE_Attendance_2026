@@ -147,3 +147,47 @@ test('keeps focus in an add-record dialog while typing', async ({ page }) => {
   await expect(fullName).toHaveValue('Vera Visual');
   await expect(fullName).toBeFocused();
 });
+
+test('marks in with a chosen bay and time, then releases it on OUT', async ({ page }) => {
+  await login(page, 'e2e.security');
+  await page.goto('/kiosk');
+  await page.getByRole('combobox').fill('Vera Visual');
+  await page.getByRole('option', { name: /Vera Visual/ }).click();
+
+  await page.getByRole('button', { name: 'Change time' }).click();
+  const localTime = await page.evaluate(() => {
+    const value = new Date(Date.now() - 5 * 60_000);
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Indian/Mauritius',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(value)
+        .map((part) => [part.type, part.value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  });
+  await page.getByLabel('Time (Mauritius)').fill(localTime);
+
+  const parking = page.getByLabel('Parking bay');
+  await parking.selectOption({ index: 1 });
+  const selectedBay = (await parking.locator('option:checked').textContent()) ?? '';
+  const [bayCode, bayType, areaName] = selectedBay.split(' · ');
+  if (!bayCode || !bayType || !areaName) throw new Error(`Unexpected parking option: ${selectedBay}`);
+
+  await page.getByRole('button', { name: `Mark IN & park ${bayCode}` }).click();
+  await expect(page.getByText(`Parked in ${bayCode}, ${areaName}.`)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Mark OUT' }).click();
+  await expect(page.getByText(`Released ${bayCode}.`)).toBeVisible();
+
+  await page.goto('/parking');
+  await page.getByLabel('Area').selectOption({ label: areaName });
+  const typeLabel = bayType!.charAt(0).toUpperCase() + bayType!.slice(1);
+  await expect(page.getByLabel(`${bayCode}, ${typeLabel} bay, free`)).toBeVisible();
+});

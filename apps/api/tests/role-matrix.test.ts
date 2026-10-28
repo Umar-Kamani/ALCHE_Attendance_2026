@@ -21,8 +21,6 @@ const MONTH = DateTime.now().setZone('Indian/Mauritius').toFormat('yyyy-MM');
 
 const EMPTY_CSV =
   'employee_code,first_name,last_name,department\nROLE001,Role,Probe,Administration\n';
-const STUDENT_CSV = 'student_id,first_name,last_name\nROLE-STU-001,Role,Probe\n';
-
 const PROBES: Probe[] = [
   { method: 'GET', url: '/api/v1/kiosk/search?q=role', allowed: ['SECURITY', 'HR'] },
   { method: 'GET', url: '/api/v1/kiosk/activity', allowed: ['SECURITY', 'HR'] },
@@ -72,20 +70,6 @@ const PROBES: Probe[] = [
     body: { jobTitle: 'Probe' },
   },
   { method: 'POST', url: '/api/v1/employees/import?dryRun=true', allowed: ['HR'], multipart: EMPTY_CSV },
-  { method: 'GET', url: '/api/v1/students', allowed: ['HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/students',
-    allowed: ['SECURITY', 'HR'],
-    body: { studentId: 'ROLE-STU-100', firstName: 'Role', lastName: 'Probe' },
-  },
-  {
-    method: 'PATCH',
-    url: `/api/v1/students/${ID}`,
-    allowed: ['HR'],
-    body: { programme: 'Probe' },
-  },
-  { method: 'POST', url: '/api/v1/students/import?dryRun=true', allowed: ['HR'], multipart: STUDENT_CSV },
   { method: 'GET', url: '/api/v1/guests', allowed: ['SECURITY', 'HR'] },
   {
     method: 'POST',
@@ -301,7 +285,7 @@ describe('role matrix — every route', () => {
   });
 
   it('is exercised by a complete probe table', () => {
-    expect(PROBES.length).toBeGreaterThanOrEqual(55);
+    expect(PROBES.length).toBeGreaterThanOrEqual(54);
   });
 
   for (const probe of PROBES) {

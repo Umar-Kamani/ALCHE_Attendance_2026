@@ -80,11 +80,10 @@ export function OnCampusPage() {
             {query.data?.employees.length === 0 ? (
               <p className="text-body-sm text-slate">No staff are currently on campus.</p>
             ) : (
-              <Table>
+              <Table tableClassName="min-w-[560px]">
                 <THead>
                   <TR>
                     <TH>Employee</TH>
-                    <TH>Department</TH>
                     <TH>Since</TH>
                     <TH>Elapsed</TH>
                     <TH>Vehicles</TH>
@@ -102,7 +101,6 @@ export function OnCampusPage() {
                           </span>
                         </div>
                       </TD>
-                      <TD>{employee.department}</TD>
                       <TD>
                         <span className="inline-flex items-center gap-1">
                           <ClockIcon size={16} />

@@ -94,14 +94,12 @@ async function createGuestVehicle(
   const plateNorm = normalizePlate(vehicle.plate);
   const existing = await tx.vehicle.findFirst({
     where: { plateNorm, active: true },
-    include: { employee: true, student: true, guest: true },
+    include: { employee: true, guest: true },
   });
   if (existing) {
     const holder = existing.employee
       ? `${existing.employee.firstName} ${existing.employee.lastName}`
-      : existing.student
-        ? `${existing.student.firstName} ${existing.student.lastName}`
-        : (existing.guest?.fullName ?? 'another guest');
+      : (existing.guest?.fullName ?? 'another guest');
     throw conflict(
       'PLATE_TAKEN',
       `${existing.plate} is registered to ${holder}.`,

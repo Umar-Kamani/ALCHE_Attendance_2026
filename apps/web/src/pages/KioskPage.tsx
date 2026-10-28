@@ -7,13 +7,17 @@ import type {
   KioskEmployeeResult,
   KioskGuestResult,
   KioskSearchResponse,
-  KioskStudentResult,
   ParkingBoardResponse,
 } from '@alche/shared';
 import { ApiError, apiFetch } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
-import { formatTime, todayLocal } from '../lib/dates';
+import {
+  formatTime,
+  localInputToIso,
+  toLocalInputValue,
+  todayLocal,
+} from '../lib/dates';
 import {
   Avatar,
   Button,
@@ -37,7 +41,7 @@ import {
 } from '../components/icons';
 import { cn } from '../lib/cn';
 
-type SearchResult = KioskEmployeeResult | KioskStudentResult | KioskGuestResult;
+type SearchResult = KioskEmployeeResult | KioskGuestResult;
 
 interface SelectedParking {
   sessionId: string;
@@ -51,33 +55,44 @@ function bayNumber(code: string): number {
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
-function suggestedBay(board: ParkingBoardResponse | undefined, vehicleType: string) {
-  if (!board) return null;
+interface ParkingOption {
+  id: string;
+  code: string;
+  bayType: string;
+  areaName: string;
+}
+
+function freeParkingBays(
+  board: ParkingBoardResponse | undefined,
+  vehicleType: string,
+): ParkingOption[] {
+  if (!board) return [];
   const preferred = vehicleType === 'motorbike' ? 'MOTORBIKE' : 'STAFF';
-  const candidates = board.areas
+  return board.areas
     .flatMap((area) =>
-      area.bays.map((bay) => ({
-        id: bay.id,
-        code: bay.code,
-        bayType: bay.bayType,
-        areaName: area.name,
-        areaId: area.id,
-        session: bay.session,
-      })),
+      area.bays
+        .filter(
+          (bay) =>
+            bay.active &&
+            !bay.session &&
+            (bay.bayType === preferred || bay.bayType === 'GENERAL'),
+        )
+        .map((bay) => ({
+          id: bay.id,
+          code: bay.code,
+          bayType: bay.bayType,
+          areaName: area.name,
+        })),
     )
-    .filter((bay) => !bay.session)
-    .filter((bay) => bay.bayType === preferred || bay.bayType === 'GENERAL')
     .sort((a, b) => {
       if (a.bayType === preferred && b.bayType !== preferred) return -1;
       if (b.bayType === preferred && a.bayType !== preferred) return 1;
       return bayNumber(a.code) - bayNumber(b.code);
     });
-  return candidates[0] ?? null;
 }
 
 function resultLabel(result: SearchResult): string {
   if (result.kind === 'employee') return result.code;
-  if (result.kind === 'student') return result.studentId;
   return result.company ?? 'Guest';
 }
 
@@ -87,7 +102,10 @@ export function KioskPage() {
   const [selected, setSelected] = useState<SearchResult | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [directionOverride, setDirectionOverride] = useState<'IN' | 'OUT' | null>(null);
-  const [parkingChoice, setParkingChoice] = useState<'auto' | 'none'>('auto');
+  const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [parkingChoice, setParkingChoice] = useState<string>('none');
+  const [timeOverride, setTimeOverride] = useState(false);
+  const [eventTime, setEventTime] = useState(() => toLocalInputValue());
   const [formError, setFormError] = useState<string | null>(null);
   const [vehicleOpen, setVehicleOpen] = useState(false);
   const [vehicleForm, setVehicleForm] = useState({
@@ -129,7 +147,7 @@ export function KioskPage() {
 
   const results = useMemo<SearchResult[]>(() => {
     if (!search.data) return [];
-    return [...search.data.employees, ...search.data.students, ...search.data.guests];
+    return [...search.data.employees, ...search.data.guests];
   }, [search.data]);
 
   useEffect(() => {
@@ -145,21 +163,67 @@ export function KioskPage() {
   const employee = selected?.kind === 'employee' ? selected : null;
   const inferredDirection: 'IN' | 'OUT' = employee?.currentState.onCampus ? 'OUT' : 'IN';
   const direction = directionOverride ?? inferredDirection;
-  const vehicle = employee?.vehicles[0] ?? null;
-  const freeBay = suggestedBay(board.data, vehicle?.vehicleType ?? 'car');
+  const vehicle =
+    employee?.vehicles.find((item) => item.id === vehicleId) ?? employee?.vehicles[0] ?? null;
+  const parkingOptions = useMemo(
+    () => freeParkingBays(board.data, vehicle?.vehicleType ?? 'car'),
+    [board.data, vehicle?.vehicleType],
+  );
   const canOfferParking =
-    canPark && direction === 'IN' && Boolean(vehicle) && !vehicle?.activeParking && Boolean(freeBay);
-  const chosenBay = canOfferParking && parkingChoice === 'auto' ? freeBay : null;
+    canPark && direction === 'IN' && Boolean(vehicle) && !vehicle?.activeParking;
+  const chosenBay =
+    canOfferParking && parkingChoice !== 'none'
+      ? parkingOptions.find((bay) => bay.id === parkingChoice) ?? null
+      : null;
+
+  useEffect(() => {
+    if (!employee) {
+      setVehicleId(null);
+      return;
+    }
+    setVehicleId((current) =>
+      employee.vehicles.some((item) => item.id === current)
+        ? current
+        : employee.vehicles[0]?.id ?? null,
+    );
+  }, [employee?.id, employee?.vehicles.map((item) => item.id).join('|')]);
+
+  useEffect(() => {
+    if (!canOfferParking || parkingOptions.length === 0) {
+      setParkingChoice('none');
+      return;
+    }
+    if (
+      parkingChoice !== 'none' &&
+      !parkingOptions.some((bay) => bay.id === parkingChoice)
+    ) {
+      setParkingChoice(parkingOptions[0]!.id);
+    }
+  }, [canOfferParking, parkingChoice, parkingOptions]);
+
+  useEffect(() => {
+    setParkingChoice('');
+  }, [direction, vehicle?.id]);
+
+  useEffect(() => {
+    setTimeOverride(false);
+    setEventTime(toLocalInputValue());
+  }, [selected?.id]);
 
   const record = useMutation({
     mutationFn: async () => {
       if (!employee) throw new Error('Choose a person first.');
       setFormError(null);
+      const occurredAt = timeOverride ? localInputToIso(eventTime) : undefined;
+      if (timeOverride && !occurredAt) {
+        throw new Error('Choose a valid event time.');
+      }
       const eventResult = await apiFetch<CreateEventResponse>('/events', {
         method: 'POST',
         body: {
           employeeId: employee.id,
           direction,
+          ...(occurredAt ? { occurredAt } : {}),
         },
       });
 
@@ -168,7 +232,11 @@ export function KioskPage() {
         try {
           await apiFetch('/parking/sessions', {
             method: 'POST',
-            body: { vehicleId: vehicle.id, bayId: chosenBay.id },
+            body: {
+              vehicleId: vehicle.id,
+              bayId: chosenBay.id,
+              startedAt: eventResult.event.occurredAt,
+            },
           });
         } catch (error) {
           parkingError =
@@ -191,31 +259,38 @@ export function KioskPage() {
             lastDirection: direction,
             lastOccurredAt: eventResult.event.occurredAt,
           },
-          vehicles: chosenBay
-            ? current.vehicles.map((item) =>
-                item.id === vehicle?.id
-                  ? {
-                      ...item,
-                      activeParking: {
-                        sessionId: 'pending',
-                        bayId: chosenBay.id,
-                        bayCode: chosenBay.code,
-                        areaName: chosenBay.areaName,
-                        startedAt: eventResult.event.occurredAt,
-                      },
-                    }
-                  : item,
-              )
-            : current.vehicles,
+          vehicles: current.vehicles.map((item) => {
+            if (direction === 'OUT') return { ...item, activeParking: null };
+            if (item.id !== vehicle?.id) return item;
+            return chosenBay
+              ? {
+                  ...item,
+                  activeParking: {
+                    sessionId: 'pending',
+                    bayId: chosenBay.id,
+                    bayCode: chosenBay.code,
+                    areaName: chosenBay.areaName,
+                    startedAt: eventResult.event.occurredAt,
+                  },
+                }
+              : item;
+          }),
         };
       });
 
+      const released = eventResult.releasedSessions;
       if (parkingError) {
         toast.push({
           title: `${employee!.fullName} marked ${direction}`,
           message: parkingError,
           tone: 'error',
           duration: 8_000,
+        });
+      } else if (direction === 'OUT' && released.length > 0) {
+        toast.push({
+          title: `${employee!.fullName} marked OUT`,
+          message: `Released ${released.map((item) => item.bayCode).join(', ')}.`,
+          tone: 'success',
         });
       } else if (direction === 'IN' && chosenBay) {
         toast.push({
@@ -231,38 +306,32 @@ export function KioskPage() {
               : undefined,
         });
       } else {
-        const active = vehicle?.activeParking;
         toast.push({
           title: `${employee!.fullName} marked ${direction}`,
           message:
-            direction === 'OUT'
-              ? 'The bay remains occupied until it is released.'
-              : 'Attendance recorded.',
+            direction === 'OUT' ? 'No active parking session to release.' : 'Attendance recorded.',
           tone: 'success',
-          action:
-            direction === 'OUT' && active && canPark
-              ? {
-                  label: `Release bay ${active.bayCode}`,
-                  onClick: () => release.mutate(active.sessionId),
-                }
-              : eventResult.undoUntil
-                ? {
-                    label: 'Undo this entry',
-                    onClick: () => undo.mutate(eventResult.event.id),
-                  }
-                : undefined,
+          action: eventResult.undoUntil
+            ? {
+                label: 'Undo this entry',
+                onClick: () => undo.mutate(eventResult.event.id),
+              }
+            : undefined,
         });
       }
 
       setDirectionOverride(null);
-      setParkingChoice('auto');
+      setParkingChoice('');
+      setTimeOverride(false);
+      setEventTime(toLocalInputValue());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['kiosk'] }),
         queryClient.invalidateQueries({ queryKey: ['parking'] }),
+        queryClient.invalidateQueries({ queryKey: ['on-campus'] }),
       ]);
       const refreshed = await search.refetch();
       const next = refreshed.data
-        ? [...refreshed.data.employees, ...refreshed.data.students, ...refreshed.data.guests].find(
+        ? [...refreshed.data.employees, ...refreshed.data.guests].find(
             (item) => item.kind === employee!.kind && item.id === employee!.id,
           )
         : null;
@@ -333,32 +402,13 @@ export function KioskPage() {
     },
   });
 
-  const release = useMutation({
-    mutationFn: (sessionId: string) =>
-      apiFetch(`/parking/sessions/${sessionId}/release`, {
-        method: 'POST',
-        body: { reason: 'Released from kiosk after staff checkout' },
-      }),
-    onSuccess: async () => {
-      toast.push({ title: 'Bay released', message: 'The bay is free again.', tone: 'success' });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['parking'] }),
-        queryClient.invalidateQueries({ queryKey: ['kiosk'] }),
-      ]);
-    },
-    onError: (error) => {
-      toast.push({
-        title: 'Could not release the bay',
-        message: error instanceof ApiError ? error.message : 'Try again from the parking board.',
-        tone: 'error',
-      });
-    },
-  });
-
   const choose = (result: SearchResult) => {
     setSelected(result);
     setDirectionOverride(null);
-    setParkingChoice('auto');
+    setVehicleId(result.kind === 'employee' ? (result.vehicles[0]?.id ?? null) : null);
+    setParkingChoice('');
+    setTimeOverride(false);
+    setEventTime(toLocalInputValue());
     setFormError(null);
   };
 
@@ -437,13 +487,13 @@ export function KioskPage() {
               <p className="p-4 text-body-sm text-slate">No matching person or vehicle.</p>
             ) : (
               <div className="divide-y divide-mist">
-                {(['employee', 'student', 'guest'] as const).map((kind) => {
+                {(['employee', 'guest'] as const).map((kind) => {
                   const group = results.filter((result) => result.kind === kind);
                   if (group.length === 0) return null;
                   return (
                     <div key={kind} className="p-2">
                       <p className="px-3 pb-1 pt-2 text-caption font-medium uppercase tracking-caption text-slate">
-                        {kind === 'employee' ? 'Staff' : kind === 'student' ? 'Students' : 'Guests'}
+                        {kind === 'employee' ? 'Staff' : 'Guests'}
                       </p>
                       {group.map((result) => {
                         const globalIndex = results.indexOf(result);
@@ -470,9 +520,6 @@ export function KioskPage() {
                               <span className="block truncate text-caption text-slate">
                                 {resultLabel(result)}
                                 {result.kind === 'employee' ? ` · ${result.department}` : ''}
-                                {result.kind === 'student' && result.programme
-                                  ? ` · ${result.programme}`
-                                  : ''}
                               </span>
                             </span>
                             {result.kind === 'employee' ? (
@@ -510,17 +557,13 @@ export function KioskPage() {
                     {selected.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
                   </StatusPill>
                 ) : (
-                  <StatusPill tone="NEUTRAL">
-                    {selected.kind === 'student' ? 'STUDENT' : 'GUEST'}
-                  </StatusPill>
+                  <StatusPill tone="NEUTRAL">GUEST</StatusPill>
                 )}
               </div>
               <p className="mt-1 text-body-sm text-slate">
                 {selected.kind === 'employee'
                   ? `${selected.code} · ${selected.department}`
-                  : selected.kind === 'student'
-                    ? `${selected.studentId}${selected.programme ? ` · ${selected.programme}` : ''}`
-                    : (selected.company ?? 'Guest visit')}
+                  : (selected.company ?? 'Guest visit')}
               </p>
 
               {selected.kind === 'employee' ? (
@@ -533,9 +576,7 @@ export function KioskPage() {
                 </p>
               ) : (
                 <p className="mt-3 text-body-sm text-slate">
-                  {selected.kind === 'student'
-                    ? 'Students do not have attendance records. Use the parking board to allocate a bay.'
-                    : 'Guests are checked in from the Guest register so the host and visit are recorded.'}
+                  Guests are checked in from the Guest register so the host and visit are recorded.
                 </p>
               )}
             </div>
@@ -564,33 +605,71 @@ export function KioskPage() {
                 </Button>
               </div>
 
+              {selected.vehicles.length > 1 ? (
+                <div className="mt-4 max-w-sm">
+                  <Select
+                    label="Vehicle for this action"
+                    value={vehicle?.id ?? ''}
+                    onChange={(event) => setVehicleId(event.target.value || null)}
+                    options={selected.vehicles.map((item) => ({
+                      value: item.id,
+                      label: `${item.plate}${item.make ? ` · ${item.make}` : ''}`,
+                    }))}
+                  />
+                </div>
+              ) : null}
+
+              <fieldset className="mt-5 rounded-3xl bg-cloud p-4">
+                <legend className="px-1 text-body-sm font-medium text-ink">Event time</legend>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-body-sm text-slate">
+                    {timeOverride
+                      ? 'Custom time will be used for attendance and parking.'
+                      : 'The current time will be recorded.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-10 items-center rounded-md px-2 text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
+                    onClick={() => {
+                      if (!timeOverride) setEventTime(toLocalInputValue());
+                      setTimeOverride((current) => !current);
+                    }}
+                  >
+                    {timeOverride ? 'Use current time' : 'Change time'}
+                  </button>
+                </div>
+                {timeOverride ? (
+                  <div className="mt-3 max-w-xs">
+                    <Input
+                      label="Time (Mauritius)"
+                      type="datetime-local"
+                      value={eventTime}
+                      max={toLocalInputValue()}
+                      onChange={(event) => setEventTime(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </fieldset>
+
               {canPark && direction === 'IN' && vehicle && !vehicle.activeParking ? (
                 <fieldset className="mt-5 rounded-3xl bg-cloud p-4">
                   <legend className="px-1 text-body-sm font-medium text-ink">
                     Parking for {vehicle.plate}
                   </legend>
-                  {freeBay ? (
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-mist bg-snow px-3">
-                        <input
-                          type="radio"
-                          name="parking"
-                          checked={parkingChoice === 'auto'}
-                          onChange={() => setParkingChoice('auto')}
-                        />
-                        <span className="text-body-sm text-ink">
-                          Park in <strong>{freeBay.code}</strong> · {freeBay.areaName}
-                        </span>
-                      </label>
-                      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-mist bg-snow px-3">
-                        <input
-                          type="radio"
-                          name="parking"
-                          checked={parkingChoice === 'none'}
-                          onChange={() => setParkingChoice('none')}
-                        />
-                        <span className="text-body-sm text-ink">No parking</span>
-                      </label>
+                  {parkingOptions.length > 0 ? (
+                    <div className="mt-3 max-w-md">
+                      <Select
+                        label="Parking bay"
+                        value={parkingChoice}
+                        onChange={(event) => setParkingChoice(event.target.value)}
+                        options={[
+                          { value: 'none', label: 'No parking' },
+                          ...parkingOptions.map((bay) => ({
+                            value: bay.id,
+                            label: `${bay.code} · ${bay.bayType.toLowerCase()} · ${bay.areaName}`,
+                          })),
+                        ]}
+                      />
                     </div>
                   ) : (
                     <p className="mt-2 text-body-sm text-slate">

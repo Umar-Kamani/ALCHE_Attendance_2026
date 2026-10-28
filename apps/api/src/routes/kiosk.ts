@@ -92,14 +92,11 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
             { plate: { contains: q, mode: 'insensitive' } },
           ],
         },
-        select: { employeeId: true, studentId: true, guestId: true },
+        select: { employeeId: true, guestId: true },
         take: 100,
       });
       const employeeIds = plateVehicles
         .map((vehicle) => vehicle.employeeId)
-        .filter((id): id is string => Boolean(id));
-      const studentIds = plateVehicles
-        .map((vehicle) => vehicle.studentId)
         .filter((id): id is string => Boolean(id));
       const guestIds = plateVehicles
         .map((vehicle) => vehicle.guestId)
@@ -112,15 +109,7 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
           { code: { contains: term, mode: 'insensitive' as const } },
         ],
       }));
-      const studentTokenWhere = terms.map((term) => ({
-        OR: [
-          { firstName: { contains: term, mode: 'insensitive' as const } },
-          { lastName: { contains: term, mode: 'insensitive' as const } },
-          { studentId: { contains: term, mode: 'insensitive' as const } },
-        ],
-      }));
-
-      const [employees, students, guests] = await Promise.all([
+      const [employees, guests] = await Promise.all([
         prisma.employee.findMany({
           where: {
             OR: [
@@ -137,17 +126,6 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
             },
             vehicles: VEHICLE_INCLUDE,
           },
-          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-          take: 8,
-        }),
-        prisma.student.findMany({
-          where: {
-            OR: [
-              ...(studentTokenWhere.length ? [{ AND: studentTokenWhere }] : []),
-              ...(studentIds.length ? [{ id: { in: studentIds } }] : []),
-            ],
-          },
-          include: { vehicles: VEHICLE_INCLUDE },
           orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
           take: 8,
         }),
@@ -185,15 +163,6 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
             vehicles: employee.vehicles.map(serializeVehicle),
           };
         }),
-        students: students.map((student) => ({
-          kind: 'student' as const,
-          id: student.id,
-          studentId: student.studentId,
-          fullName: `${student.firstName} ${student.lastName}`,
-          programme: student.programme,
-          active: student.active,
-          vehicles: student.vehicles.map(serializeVehicle),
-        })),
         guests: guests.map((guest) => ({
           kind: 'guest' as const,
           id: guest.id,

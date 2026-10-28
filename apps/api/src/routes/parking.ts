@@ -553,6 +553,15 @@ export async function parkingRoutes(app: FastifyInstance): Promise<void> {
         bay.bayType as never,
         vehicle.vehicleType,
       );
+      const startedAt = request.body.startedAt
+        ? new Date(request.body.startedAt)
+        : nowUtc().toJSDate();
+      if (Number.isNaN(startedAt.getTime())) {
+        throw unprocessable('The parking start time is invalid.');
+      }
+      if (startedAt.getTime() > nowUtc().plus({ seconds: 60 }).toMillis()) {
+        throw unprocessable('The parking start time cannot be in the future.');
+      }
       const overrideReason = request.body.overrideReason?.trim() || null;
       if (eligibility.requiresOverride && !overrideReason) {
         throw unprocessable(
@@ -570,7 +579,7 @@ export async function parkingRoutes(app: FastifyInstance): Promise<void> {
             plateSnapshot: vehicle.plate,
             holderNameSnapshot: holder.name,
             holderCategory: holder.category,
-            startedAt: nowUtc().toJSDate(),
+            startedAt,
             allocatedBy: request.authUser!.id,
             overrideReason: eligibility.requiresOverride ? overrideReason : null,
             note: request.body.note ?? null,

@@ -3,10 +3,20 @@ import { cn } from '../../lib/cn';
 import { AlertIcon, RefreshIcon } from '../icons';
 import { Button } from './Button';
 
-export function Table({ children, className }: { children: ReactNode; className?: string }) {
+export function Table({
+  children,
+  className,
+  tableClassName,
+}: {
+  children: ReactNode;
+  className?: string;
+  tableClassName?: string;
+}) {
   return (
     <div className={cn('alche-scrollbar w-full overflow-x-auto', className)}>
-      <table className="w-full min-w-[720px] border-collapse text-left">{children}</table>
+      <table className={cn('w-full min-w-[720px] border-collapse text-left', tableClassName)}>
+        {children}
+      </table>
     </div>
   );
 }

@@ -6,15 +6,15 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 
 - **Dean access (answered):** a third role, `DEAN`, gets a read-only aggregate dashboard. It cannot view names, guest personal data, attendance detail, exports, audit records, or any mutation route.
 - **Dean scope (answered):** the dashboard shows today’s snapshot, current-month totals, a 30-day trend and a read-only date-range selector. It is aggregate-only and `DEAN`-only.
-- **Scale (default):** sized for about 250 staff, 600 students, 100–150 guest visits/week, 60 bays and one gate. Pagination remains 50 rows; the bay board is not virtualised.
+- **Scale (default):** sized for about 250 staff, 100–150 guest visits/week, 60 bays and one gate. Pagination remains 50 rows; the bay board is not virtualised.
 - **Shifts (default):** security covers nights; no separate Shift entity. Overnight attendance follows the entry-date rule below.
 - **Bay sharing (default):** bay types are permanent; `GENERAL` is the flexible pool. No time-window reservation model.
 - **Permits (default):** no numbered permit/sticker database field in v1; vehicle notes can hold an informal reference.
 - **Devices (default):** one gate desktop plus a tablet, responsive at both. No label printer; badge numbers are free text.
-- **Identity (default):** employee codes are 2–32 alphanumeric and student IDs occupy a separate namespace. Matching strings across the two tables do not conflict.
+- **Identity (default):** employee codes are 2–32 alphanumeric. Vehicles belong to an employee or guest; there is no student directory or student identity namespace.
 - **Retention (default):** attendance, guest and parking history retained for at least seven years; no automatic purge in v1; 30 daily backups retained.
 - **Parking inventory writes:** the capability table is authoritative. `SECURITY` may manage areas/bays; `HR` has read-only inventory access.
-- **Contractors:** both `staff` and `contractor` employees are eligible for `STAFF` bays. Parking categories are employee/student/guest, not employment subtype.
+- **Contractors:** both `staff` and `contractor` employees are eligible for `STAFF` bays. Parking categories are employee/guest, not employment subtype.
 - **`ACCESSIBLE` eligibility:** no accessibility permit exists in the specified model, so allocating any vehicle to an `ACCESSIBLE` bay requires an audited typed override. The app does not invent a permit field.
 - **No third access role beyond `DEAN`:** facilities, finance and the registrar use HR exports.
 
@@ -26,7 +26,7 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 - **Kiosk direction:** the UI resolves and sends the inferred direction so a second tap cannot turn a double-submit into the opposite event. The server still infers direction when omitted and applies the 120-second duplicate guard.
 - **Undo:** only the current user’s own gate event, within five minutes. Undo is a soft void, audited as `gate_undo`.
 - **Day flags:** `NO_EXIT` is added to historical `ON_SITE` rows; the current day is simply on site. `DUPLICATE_SUSPECT` requires an amended/day-edited context per the brief.
-- **No student attendance:** students appear in kiosk search only for parking identity.
+- **No student tracking:** student records, imports and kiosk search were removed. Existing Student bays were converted to General and historical parking snapshots were preserved without student vehicle references.
 
 ## Amendment tickets
 
@@ -41,7 +41,7 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 - **Guest status:** stored values are `EXPECTED`, `ON_SITE`, `DEPARTED`, `CANCELLED`; `OVERDUE` is computed when `expected_to` has passed while still on site. This keeps time-based state truthful without a scheduler.
 - **Guest deactivation:** guests are deactivated, never deleted. Visits remain permanent.
 - **Plate normalisation:** uppercase with spaces and dashes removed. Active plates are unique; inactive plates are retained for history.
-- **Exactly one holder:** a database CHECK enforces exactly one of employee/student/guest.
+- **Exactly one holder:** a vehicle belongs to exactly one employee or guest. Historical parking sessions retain their original holder-category snapshot.
 
 ## Parking
 
@@ -63,7 +63,7 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 - **CSV parsing:** `csv-parse` handles BOM, CRLF and quoted commas. Header validation reads the first CSV record with the same parser before streaming the data.
 - **CSV exports:** `csv-stringify` adds a UTF-8 BOM and CRLF records. Ranges are capped at 366 inclusive days.
 - **`/healthz`:** unauthenticated, outside `/api/v1`.
-- **`/auth/change-password` and student PATCH:** added as necessary supporting routes not enumerated in the API shape.
+- **`/auth/change-password`:** added as a necessary supporting route not enumerated in the API shape.
 - **Guest and parking exports:** allowed for both `SECURITY` and `HR`; attendance and raw-event exports remain HR-only.
 
 ## Design
@@ -80,7 +80,7 @@ Every judgement call that changes behaviour, schema, access, deployment or desig
 
 ## Additional implementation decisions
 
-- **One active session per holder:** in addition to the bay and vehicle partial unique indexes, the allocation service refuses a second active session for any vehicle belonging to the same employee, student or guest. This expresses the brief’s holder rule without storing a duplicated holder key on sessions.
+- **One active session per holder:** in addition to the bay and vehicle partial unique indexes, the allocation service refuses a second active session for any vehicle belonging to the same employee or guest. This expresses the holder rule without storing a duplicated holder key on sessions.
 - **HR direct events:** `POST /events` accepts `hrEdit=true` and a mandatory reason for HR. It writes `source='hr_edit'`; the kiosk path never sets this flag and continues to write `source='gate'`.
 - **Login throttling:** the per-IP limit is 100 attempts per 15 minutes. The precise anti-brute-force control remains the per-username DB counter that locks after five failures. A 10-per-IP limit would lock out a shared gate PC after routine successful sign-ins.
 - **Guest host filter and filtered export:** the register filters by host and status, and those filters are passed to the guest CSV export rather than exporting the unfiltered range.

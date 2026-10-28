@@ -19,7 +19,7 @@ async function hrClient(app: FastifyInstance): Promise<TestClient> {
   return client;
 }
 
-describe('P2 employee, student and CSV import', () => {
+describe('P2 employee and CSV import', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -224,17 +224,15 @@ describe('P2 employee, student and CSV import', () => {
     expect(list.body.items).toHaveLength(1);
   });
 
-  it('imports students through the shared importer', async () => {
+  it('no longer exposes the student directory', async () => {
     const client = await hrClient(app);
-    const file = await sample('sample_students.csv');
-    const result = await client.inject<{ created: number; updated: number; invalid: number }>({
+    const list = await client.inject({ url: '/api/v1/students' });
+    expect(list.status).toBe(404);
+    const importRoute = await client.inject({
       method: 'POST',
-      url: '/api/v1/students/import?dryRun=false',
-      multipart: { filename: 'sample_students.csv', content: file },
+      url: '/api/v1/students/import?dryRun=true',
     });
-    expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ created: 8, updated: 0, invalid: 0 });
-    expect(await prisma.student.count()).toBe(8);
+    expect(importRoute.status).toBe(404);
   });
 
   it('audits imports and exposes idempotent batch counts', async () => {

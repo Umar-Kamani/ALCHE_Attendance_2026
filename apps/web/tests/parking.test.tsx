@@ -103,7 +103,6 @@ const board = {
   },
   legend: [
     { type: 'STAFF', label: 'Staff', chip: 'S' },
-    { type: 'STUDENT', label: 'Student', chip: 'St' },
     { type: 'GUEST', label: 'Guest', chip: 'G' },
     { type: 'GENERAL', label: 'General', chip: 'Gen' },
     { type: 'ACCESSIBLE', label: 'Accessible', chip: 'Acc' },
@@ -111,17 +110,17 @@ const board = {
   ],
 };
 
-const studentVehicle = {
-  id: 'vehicle-student',
-  plate: 'ST 2026',
-  plateNorm: 'ST2026',
+const guestVehicle = {
+  id: 'vehicle-guest',
+  plate: 'GU 2026',
+  plateNorm: 'GU2026',
   make: 'Toyota',
   model: 'Vitz',
   colour: 'Black',
   vehicleType: 'car',
   active: true,
   notes: null,
-  holder: { kind: 'student', id: 'student-1', name: 'Aisha Peerboccus' },
+  holder: { kind: 'guest', id: 'guest-1', name: 'Aisha Peerboccus' },
   activeParking: null,
   lastSeenAt: null,
   createdAt: '2026-10-19T04:00:00.000Z',
@@ -138,7 +137,7 @@ describe('parking board', () => {
       if (path.startsWith('/parking/board')) return Promise.resolve(board);
       if (path.startsWith('/vehicles')) {
         return Promise.resolve({
-          items: [studentVehicle],
+          items: [guestVehicle],
           meta: { page: 1, pageSize: 50, total: 1, totalPages: 1 },
         });
       }
@@ -152,10 +151,10 @@ describe('parking board', () => {
 
     fireEvent.click(screen.getByLabelText('A-01, Staff bay, free'));
     const search = await screen.findByLabelText('Find vehicle or holder');
-    fireEvent.change(search, { target: { value: 'ST 2026' } });
+    fireEvent.change(search, { target: { value: 'GU 2026' } });
     const result = await screen.findByRole(
       'button',
-      { name: /ST 2026.*Aisha Peerboccus/s },
+      { name: /GU 2026.*Aisha Peerboccus/s },
       { timeout: 3000 },
     );
     fireEvent.click(result);
@@ -165,7 +164,7 @@ describe('parking board', () => {
     expect(reason).toBeInTheDocument();
     expect(allocate).toBeDisabled();
 
-    fireEvent.change(reason, { target: { value: 'Student overflow approved by security supervisor' } });
+    fireEvent.change(reason, { target: { value: 'Guest overflow approved by security supervisor' } });
     await waitFor(() => expect(allocate).toBeEnabled());
   });
 });

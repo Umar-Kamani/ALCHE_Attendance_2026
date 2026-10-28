@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { BayChipTypeSchema, BayTypeSchema, HolderCategorySchema, SessionEndReasonSchema, VehicleTypeSchema } from './enums.js';
+import {
+  BayChipTypeSchema,
+  BayTypeSchema,
+  HolderCategorySchema,
+  SessionEndReasonSchema,
+  VehicleHolderKindSchema,
+  VehicleTypeSchema,
+} from './enums.js';
 import { PaginationMetaSchema, QueryBooleanSchema, SuccessSchema, UuidSchema } from './common.js';
 
 export const VehicleSchema = z.object({
@@ -50,7 +57,7 @@ export type VehicleDetail = z.infer<typeof VehicleDetailSchema>;
 
 export const VehicleListQuerySchema = z.object({
   q: z.string().trim().max(160).optional(),
-  holderKind: HolderCategorySchema.optional(),
+  holderKind: VehicleHolderKindSchema.optional(),
   page: z.coerce.number().int().min(1).default(1),
 });
 
@@ -69,7 +76,7 @@ export const CreateVehicleBodySchema = z.object({
   vehicleType: VehicleTypeSchema.default('car'),
   active: z.boolean().default(true),
   notes: z.string().trim().max(500).optional().nullable(),
-  holderKind: HolderCategorySchema,
+  holderKind: VehicleHolderKindSchema,
   holderId: UuidSchema,
 });
 
@@ -234,6 +241,7 @@ export const AllocateSessionBodySchema = z
     bayId: UuidSchema.optional(),
     autoAssign: z.boolean().default(false),
     vehicleId: UuidSchema,
+    startedAt: z.string().datetime({ offset: true }).optional(),
     overrideReason: z.string().trim().min(3).max(1000).optional().nullable(),
     note: z.string().trim().max(500).optional().nullable(),
   })

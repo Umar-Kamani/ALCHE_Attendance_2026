@@ -40,7 +40,7 @@ function overrideRequired(bayType: BayType, holder: Vehicle['holder']['kind'], v
   if (bayType === 'GENERAL') return false;
   if (bayType === 'ACCESSIBLE') return true;
   if (bayType === 'MOTORBIKE') return vehicleType !== 'motorbike';
-  const expected = bayType === 'STAFF' ? 'employee' : bayType === 'STUDENT' ? 'student' : 'guest';
+  const expected = bayType === 'STAFF' ? 'employee' : 'guest';
   return holder !== expected;
 }
 
@@ -277,7 +277,6 @@ export function ParkingBoardPage() {
               placeholder="All types"
               options={[
                 ['STAFF', 'Staff'],
-                ['STUDENT', 'Student'],
                 ['GUEST', 'Guest'],
                 ['GENERAL', 'General'],
                 ['ACCESSIBLE', 'Accessible'],

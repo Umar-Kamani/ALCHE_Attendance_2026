@@ -29,7 +29,6 @@ import { PlusIcon } from '../components/icons';
 
 const BAY_TYPES: Array<{ value: BayType; label: string }> = [
   { value: 'STAFF', label: 'Staff' },
-  { value: 'STUDENT', label: 'Student' },
   { value: 'GUEST', label: 'Guest' },
   { value: 'GENERAL', label: 'General' },
   { value: 'ACCESSIBLE', label: 'Accessible' },

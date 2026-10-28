@@ -20,13 +20,11 @@ import {
   sessionHistory,
 } from '../serializers/vehicles.js';
 
-async function resolveHolder(kind: 'employee' | 'student' | 'guest', id: string) {
+async function resolveHolder(kind: 'employee' | 'guest', id: string) {
   const holder =
     kind === 'employee'
       ? await prisma.employee.findUnique({ where: { id } })
-      : kind === 'student'
-        ? await prisma.student.findUnique({ where: { id } })
-        : await prisma.guest.findUnique({ where: { id } });
+      : await prisma.guest.findUnique({ where: { id } });
   if (!holder) throw notFound('That vehicle holder does not exist.');
   if (!holder.active) throw unprocessable('That holder is inactive.');
   return holder;
@@ -39,14 +37,12 @@ async function plateConflict(plateNorm: string, excludeId?: string) {
       active: true,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
-    include: { employee: true, student: true, guest: true },
+    include: { employee: true, guest: true },
   });
   if (existing) {
     const holder = existing.employee
       ? `${existing.employee.firstName} ${existing.employee.lastName}`
-      : existing.student
-        ? `${existing.student.firstName} ${existing.student.lastName}`
-        : (existing.guest?.fullName ?? 'another holder');
+      : (existing.guest?.fullName ?? 'another holder');
     throw conflict(
       'PLATE_TAKEN',
       `${existing.plate} is registered to ${holder}.`,
@@ -77,19 +73,15 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
                 { plate: { contains: q, mode: 'insensitive' as const } },
                 { employee: { firstName: { contains: q, mode: 'insensitive' as const } } },
                 { employee: { lastName: { contains: q, mode: 'insensitive' as const } } },
-                { student: { firstName: { contains: q, mode: 'insensitive' as const } } },
-                { student: { lastName: { contains: q, mode: 'insensitive' as const } } },
                 { guest: { fullName: { contains: q, mode: 'insensitive' as const } } },
               ],
             }
           : {}),
         ...(request.query.holderKind === 'employee'
           ? { employeeId: { not: null } }
-          : request.query.holderKind === 'student'
-            ? { studentId: { not: null } }
-            : request.query.holderKind === 'guest'
-              ? { guestId: { not: null } }
-              : {}),
+          : request.query.holderKind === 'guest'
+            ? { guestId: { not: null } }
+            : {}),
       };
       const [vehicles, total] = await Promise.all([
         prisma.vehicle.findMany({
@@ -149,7 +141,6 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
           active: request.body.active,
           notes: request.body.notes ?? null,
           employeeId: request.body.holderKind === 'employee' ? request.body.holderId : null,
-          studentId: request.body.holderKind === 'student' ? request.body.holderId : null,
           guestId: request.body.holderKind === 'guest' ? request.body.holderId : null,
         },
         include: VEHICLE_INCLUDE,

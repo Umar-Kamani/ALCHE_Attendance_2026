@@ -4,7 +4,6 @@ import { iso, isoRequired } from '../time.js';
 
 export const VEHICLE_INCLUDE = {
   employee: { select: { id: true, firstName: true, lastName: true, code: true } },
-  student: { select: { id: true, firstName: true, lastName: true, studentId: true } },
   guest: { select: { id: true, fullName: true } },
   sessions: {
     orderBy: { startedAt: 'desc' as const },
@@ -20,7 +19,7 @@ export function normalizePlate(plate: string): string {
 }
 
 export function holderOf(vehicle: VehicleRecord): {
-  kind: 'employee' | 'student' | 'guest';
+  kind: 'employee' | 'guest';
   id: string;
   name: string;
 } {
@@ -29,13 +28,6 @@ export function holderOf(vehicle: VehicleRecord): {
       kind: 'employee',
       id: vehicle.employee.id,
       name: `${vehicle.employee.firstName} ${vehicle.employee.lastName}`,
-    };
-  }
-  if (vehicle.student) {
-    return {
-      kind: 'student',
-      id: vehicle.student.id,
-      name: `${vehicle.student.firstName} ${vehicle.student.lastName}`,
     };
   }
   return { kind: 'guest', id: vehicle.guest!.id, name: vehicle.guest!.fullName };

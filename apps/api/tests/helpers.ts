@@ -13,7 +13,6 @@ const TABLES = [
   'Vehicle',
   'ParkingBay',
   'ParkingArea',
-  'Student',
   'Employee',
   'Guest',
   'Session',

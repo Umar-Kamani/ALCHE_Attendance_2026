@@ -193,9 +193,24 @@ async function main(): Promise<void> {
     'Visual',
     'Visual Pool',
   );
-  await ensureVisualVehicle('VIS 001', visualOne.id);
+  const one = await ensureVisualVehicle('VIS 001', visualOne.id);
   const two = await ensureVisualVehicle('VIS 002', visualTwo.id);
   const three = await ensureVisualVehicle('VIS 003', visualThree.id);
+
+  await endActiveSessionForVehicle(one.id, hrId);
+  await endActiveSessionForVehicle(two.id, hrId);
+  await endActiveSessionForVehicle(three.id, hrId);
+  await prisma.event.updateMany({
+    where: {
+      employeeId: { in: [visualOne.id, visualTwo.id, visualThree.id] },
+      voidedAt: null,
+    },
+    data: {
+      voidedAt: new Date(),
+      voidedBy: hrId,
+      voidReason: 'Visual fixture reset',
+    },
+  });
 
   await prisma.parkingSession.updateMany({
     where: {
@@ -231,32 +246,27 @@ async function main(): Promise<void> {
     });
   }
 
-  const visualEventExists = await prisma.event.findFirst({
-    where: { employeeId: visualOne.id, note: 'visual-fixture' },
+  const day = DateTime.fromISO('2026-09-10', { zone: APP_ZONE });
+  await prisma.event.createMany({
+    data: [
+      {
+        employeeId: visualOne.id,
+        occurredAt: day.set({ hour: 8, minute: 3 }).toUTC().toJSDate(),
+        direction: 'IN',
+        recordedBy: hrId,
+        source: 'gate',
+        note: 'visual-fixture',
+      },
+      {
+        employeeId: visualOne.id,
+        occurredAt: day.set({ hour: 17, minute: 12 }).toUTC().toJSDate(),
+        direction: 'OUT',
+        recordedBy: hrId,
+        source: 'gate',
+        note: 'visual-fixture',
+      },
+    ],
   });
-  if (!visualEventExists) {
-    const day = DateTime.fromISO('2026-09-10', { zone: APP_ZONE });
-    await prisma.event.createMany({
-      data: [
-        {
-          employeeId: visualOne.id,
-          occurredAt: day.set({ hour: 8, minute: 3 }).toUTC().toJSDate(),
-          direction: 'IN',
-          recordedBy: hrId,
-          source: 'gate',
-          note: 'visual-fixture',
-        },
-        {
-          employeeId: visualOne.id,
-          occurredAt: day.set({ hour: 17, minute: 12 }).toUTC().toJSDate(),
-          direction: 'OUT',
-          recordedBy: hrId,
-          source: 'gate',
-          note: 'visual-fixture',
-        },
-      ],
-    });
-  }
 
   console.log('E2E fixtures ready.');
   console.log(`  ${'e2e.security'.padEnd(14)} ${E2E_PASSWORD}`);

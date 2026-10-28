@@ -1,4 +1,4 @@
-import type { Employee, Student } from '@prisma/client';
+import type { Employee } from '@prisma/client';
 import { isoRequired } from '../time.js';
 
 export function serializeEmployee(employee: Employee) {
@@ -16,20 +16,5 @@ export function serializeEmployee(employee: Employee) {
     active: employee.active,
     createdAt: isoRequired(employee.createdAt),
     updatedAt: isoRequired(employee.updatedAt),
-  };
-}
-
-export function serializeStudent(student: Student) {
-  return {
-    id: student.id,
-    studentId: student.studentId,
-    firstName: student.firstName,
-    lastName: student.lastName,
-    fullName: `${student.firstName} ${student.lastName}`,
-    email: student.email,
-    programme: student.programme,
-    active: student.active,
-    createdAt: isoRequired(student.createdAt),
-    updatedAt: isoRequired(student.updatedAt),
   };
 }

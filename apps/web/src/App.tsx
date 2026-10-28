@@ -19,7 +19,6 @@ import { ParkingBoardPage } from './pages/ParkingBoardPage';
 import { ParkingBaysPage } from './pages/ParkingBaysPage';
 import { ParkingHistoryPage } from './pages/ParkingHistoryPage';
 import { EmployeesPage } from './pages/EmployeesPage';
-import { StudentsPage } from './pages/StudentsPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
 import { OnCampusPage } from './pages/OnCampusPage';
@@ -62,7 +61,6 @@ export function App() {
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/attendance/:employeeId" element={<EmployeeAttendancePage />} />
             <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/students" element={<StudentsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Route>

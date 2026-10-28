@@ -77,7 +77,7 @@ describe('kiosk', () => {
         return Promise.resolve({ items: [], onCampusCount: 1, today: '2026-10-19' });
       }
       if (path.startsWith('/kiosk/search')) {
-        return Promise.resolve({ employees: [employee], students: [], guests: [] });
+        return Promise.resolve({ employees: [employee], guests: [] });
       }
       if (path === '/parking/board') {
         return Promise.resolve({

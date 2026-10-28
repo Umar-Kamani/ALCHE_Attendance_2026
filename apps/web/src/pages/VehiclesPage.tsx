@@ -36,7 +36,7 @@ import { formatDateTime, formatTime } from '../lib/dates';
 
 interface VehicleForm {
   id?: string;
-  holderKind: 'employee' | 'student' | 'guest';
+  holderKind: 'employee' | 'guest';
   holderId: string;
   holderName: string;
   plate: string;
@@ -151,7 +151,7 @@ export function VehiclesPage() {
   const openEdit = (vehicle: Vehicle) => {
     setForm({
       id: vehicle.id,
-      holderKind: vehicle.holder.kind,
+      holderKind: vehicle.holder.kind === 'employee' ? 'employee' : 'guest',
       holderId: vehicle.holder.id,
       holderName: vehicle.holder.name,
       plate: vehicle.plate,
@@ -302,7 +302,7 @@ export function VehiclesPage() {
         description={
           form.id
             ? 'HR can change the full record. The holder cannot be moved between people.'
-            : 'Register the vehicle against exactly one employee, student or guest.'
+            : 'Register the vehicle against exactly one employee or guest.'
         }
         size="lg"
         footer={
@@ -337,7 +337,6 @@ export function VehiclesPage() {
                 }
                 options={[
                   { value: 'employee', label: 'Employee' },
-                  { value: 'student', label: 'Student' },
                   { value: 'guest', label: 'Guest' },
                 ]}
               />
@@ -360,16 +359,9 @@ export function VehiclesPage() {
                     <>
                       {(form.holderKind === 'employee'
                         ? holders.data?.employees ?? []
-                        : form.holderKind === 'student'
-                          ? holders.data?.students ?? []
-                          : holders.data?.guests ?? []
+                        : holders.data?.guests ?? []
                       ).map((holder) => {
-                        const name =
-                          holder.kind === 'employee'
-                            ? holder.fullName
-                            : holder.kind === 'student'
-                              ? holder.fullName
-                              : holder.fullName;
+                        const name = holder.fullName;
                         return (
                           <button
                             key={holder.id}
@@ -391,9 +383,7 @@ export function VehiclesPage() {
                       })}
                       {(form.holderKind === 'employee'
                         ? holders.data?.employees.length
-                        : form.holderKind === 'student'
-                          ? holders.data?.students.length
-                          : holders.data?.guests.length) === 0 ? (
+                        : holders.data?.guests.length) === 0 ? (
                         <p className="p-3 text-body-sm text-slate">No matching holder.</p>
                       ) : null}
                     </>

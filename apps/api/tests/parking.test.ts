@@ -11,7 +11,6 @@ interface Fixture {
   areaId: string;
   bayIds: Record<string, string>;
   staffVehicleId: string;
-  studentVehicleId: string;
   guestVehicleId: string;
 }
 
@@ -50,15 +49,6 @@ describe('P7 parking allocation and inventory', () => {
         active: true,
       },
     });
-    const student = await prisma.student.create({
-      data: {
-        studentId: 'STU2026001',
-        firstName: 'Aisha',
-        lastName: 'Peerboccus',
-        programme: 'Business',
-        active: true,
-      },
-    });
     const guest = await prisma.guest.create({
       data: { fullName: 'Élodie Tran', company: 'Telecom', active: true },
     });
@@ -68,15 +58,6 @@ describe('P7 parking allocation and inventory', () => {
         plateNorm: 'AB1234',
         vehicleType: 'car',
         employeeId: employee.id,
-        active: true,
-      },
-    });
-    const studentVehicle = await prisma.vehicle.create({
-      data: {
-        plate: 'ST 2026',
-        plateNorm: 'ST2026',
-        vehicleType: 'car',
-        studentId: student.id,
         active: true,
       },
     });
@@ -94,7 +75,6 @@ describe('P7 parking allocation and inventory', () => {
     });
     const bayCodes: Array<[string, string]> = [
       ['STAFF', 'A-10'],
-      ['STUDENT', 'A-20'],
       ['GENERAL', 'A-01'],
       ['GENERAL', 'A-02'],
       ['GENERAL', 'A-03'],
@@ -112,7 +92,6 @@ describe('P7 parking allocation and inventory', () => {
       areaId: area.id,
       bayIds,
       staffVehicleId: staffVehicle.id,
-      studentVehicleId: studentVehicle.id,
       guestVehicleId: guestVehicle.id,
     };
   });
@@ -147,7 +126,7 @@ describe('P7 parking allocation and inventory', () => {
       areas: Array<{ bays: Array<{ code: string; chip: string; session: unknown }> }>;
     }>({ url: '/api/v1/parking/board' });
     expect(board.status).toBe(200);
-    expect(board.body.counts.overall).toMatchObject({ total: 7, occupied: 1, free: 6 });
+    expect(board.body.counts.overall).toMatchObject({ total: 6, occupied: 1, free: 5 });
     const bay = board.body.areas
       .flatMap((area) => area.bays)
       .find((item) => item.code === 'A-10');
@@ -167,6 +146,25 @@ describe('P7 parking allocation and inventory', () => {
     expect(
       await prisma.parkingSession.count({ where: { bayId: freeBay.id, endedAt: null } }),
     ).toBe(0);
+  });
+
+  it('accepts an explicit kiosk start time for a parking session', async () => {
+    const startedAt = DateTime.now().setZone(ZONE).minus({ hours: 2 }).toUTC().toISO();
+    const response = await security.inject<{ session: { startedAt: string; bayCode: string } }>({
+      method: 'POST',
+      url: '/api/v1/parking/sessions',
+      body: {
+        vehicleId: fixture.staffVehicleId,
+        bayId: fixture.bayIds['A-10']!,
+        startedAt,
+      },
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.session.startedAt).toBe(startedAt);
+    const stored = await prisma.parkingSession.findFirstOrThrow({
+      where: { vehicleId: fixture.staffVehicleId, endedAt: null },
+    });
+    expect(stored.startedAt.toISOString()).toBe(startedAt);
   });
 
   it('rejects double allocation and double parking with friendly 409s', async () => {
@@ -205,13 +203,13 @@ describe('P7 parking allocation and inventory', () => {
   });
 
   it('blocks a mismatched bay unless a typed reason is supplied and audited', async () => {
-    const denied = await allocate(fixture.staffVehicleId, fixture.bayIds['A-20']!);
+    const denied = await allocate(fixture.staffVehicleId, fixture.bayIds['A-06']!);
     expect(denied.status).toBe(422);
     expect((denied.body as { error: { message: string } }).error.message).toContain('reserved');
 
     const allowed = await allocate(
       fixture.staffVehicleId,
-      fixture.bayIds['A-20']!,
+      fixture.bayIds['A-06']!,
       'Overflow from staff lot during graduation rehearsal',
     );
     expect(allowed.status).toBe(201);
@@ -267,11 +265,6 @@ describe('P7 parking allocation and inventory', () => {
   });
 
   it('fails when no suitable bay is free instead of using a reserved type', async () => {
-    const student = await prisma.student.findFirstOrThrow();
-    await prisma.parkingBay.updateMany({
-      where: { areaId: fixture.areaId, bayType: 'STUDENT' },
-      data: { active: false },
-    });
     let index = 0;
     for (const code of ['A-01', 'A-02', 'A-03']) {
       const filler = await prisma.employee.create({
@@ -296,7 +289,7 @@ describe('P7 parking allocation and inventory', () => {
       await allocate(vehicle.id, fixture.bayIds[code]!);
       index += 1;
     }
-    const result = await allocate(fixture.studentVehicleId);
+    const result = await allocate(fixture.guestVehicleId);
     expect(result.status).toBe(409);
     expect((result.body as { error: { code: string } }).error.code).toBe('NO_SUITABLE_BAY');
   });
