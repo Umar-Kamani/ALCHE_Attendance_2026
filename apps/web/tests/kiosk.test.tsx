@@ -76,15 +76,11 @@ describe('kiosk', () => {
       if (path === '/kiosk/activity') {
         return Promise.resolve({ items: [], onCampusCount: 1, today: '2026-10-19' });
       }
-      if (path.startsWith('/kiosk/search')) {
-        return Promise.resolve({ employees: [employee], guests: [] });
+      if (path === '/kiosk/employees') {
+        return Promise.resolve({ employees: [employee] });
       }
-      if (path === '/parking/board') {
-        return Promise.resolve({
-          areas: [],
-          counts: { overall: { total: 0, occupied: 0, free: 0 }, byType: {} },
-          legend: [],
-        });
+      if (path.startsWith('/kiosk/search')) {
+        return Promise.resolve({ employees: [employee] });
       }
       if (path === '/events' && init?.method === 'POST') {
         eventCalls += 1;
@@ -95,7 +91,9 @@ describe('kiosk', () => {
 
     render(wrapper(<KioskPage />));
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Nadia' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search employees and vehicles' }), {
+      target: { value: 'Nadia' },
+    });
     const result = await screen.findByRole('option', { name: /Nadia Bossy/ }, { timeout: 3000 });
     fireEvent.click(result);
 

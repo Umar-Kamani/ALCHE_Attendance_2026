@@ -14,10 +14,6 @@ import { AttendancePage } from './pages/AttendancePage';
 import { EmployeeAttendancePage } from './pages/EmployeeAttendancePage';
 import { TicketsPage } from './pages/TicketsPage';
 import { VehiclesPage } from './pages/VehiclesPage';
-import { GuestsPage } from './pages/GuestsPage';
-import { ParkingBoardPage } from './pages/ParkingBoardPage';
-import { ParkingBaysPage } from './pages/ParkingBaysPage';
-import { ParkingHistoryPage } from './pages/ParkingHistoryPage';
 import { EmployeesPage } from './pages/EmployeesPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
@@ -50,10 +46,6 @@ export function App() {
         <Route element={<AppShell />}>
           <Route path="/kiosk" element={<KioskPage />} />
           <Route path="/on-campus" element={<OnCampusPage />} />
-          <Route path="/guests" element={<GuestsPage />} />
-          <Route path="/parking" element={<ParkingBoardPage />} />
-          <Route path="/parking/bays" element={<ParkingBaysPage />} />
-          <Route path="/parking/history" element={<ParkingHistoryPage />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
           <Route path="/tickets" element={<TicketsPage />} />
 

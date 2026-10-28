@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import type { Prisma } from '@prisma/client';
 import {
+  KioskEmployeeOptionsResponseSchema,
   KioskSearchQuerySchema,
   KioskSearchResponseSchema,
 } from '@alche/shared';
@@ -21,49 +23,45 @@ function normalizedPlate(query: string): string {
 
 const VEHICLE_INCLUDE = {
   where: { active: true },
-  include: {
-    sessions: {
-      where: { endedAt: null },
-      take: 1,
-      include: { bay: { include: { area: true } } },
-    },
-  },
   orderBy: { plate: 'asc' as const },
 } as const;
 
-type VehicleWithSessions = {
-  id: string;
-  plate: string;
-  make: string | null;
-  model: string | null;
-  colour: string | null;
-  vehicleType: string;
-  sessions: Array<{
-    id: string;
-    bayId: string;
-    startedAt: Date;
-    bay: { code: string; area: { name: string } };
-  }>;
-};
+const EMPLOYEE_INCLUDE = {
+  events: {
+    where: { voidedAt: null, supersededById: null },
+    orderBy: { occurredAt: 'desc' as const },
+    take: 1,
+    select: { direction: true, occurredAt: true },
+  },
+  vehicles: VEHICLE_INCLUDE,
+} as const;
 
-function serializeVehicle(vehicle: VehicleWithSessions) {
-  const session = vehicle.sessions[0];
+type EmployeeRecord = Prisma.EmployeeGetPayload<{ include: typeof EMPLOYEE_INCLUDE }>;
+
+function serializeEmployee(employee: EmployeeRecord) {
+  const latest = employee.events[0];
   return {
-    id: vehicle.id,
-    plate: vehicle.plate,
-    make: vehicle.make,
-    model: vehicle.model,
-    colour: vehicle.colour,
-    vehicleType: vehicle.vehicleType,
-    activeParking: session
-      ? {
-          sessionId: session.id,
-          bayId: session.bayId,
-          bayCode: session.bay.code,
-          areaName: session.bay.area.name,
-          startedAt: isoRequired(session.startedAt),
-        }
-      : null,
+    kind: 'employee' as const,
+    id: employee.id,
+    code: employee.code,
+    fullName: `${employee.firstName} ${employee.lastName}`,
+    department: employee.department,
+    category: employee.category as 'staff' | 'contractor',
+    active: employee.active,
+    currentState: {
+      onCampus: latest?.direction === 'IN',
+      since: latest?.direction === 'IN' ? isoRequired(latest.occurredAt) : null,
+      lastDirection: (latest?.direction as 'IN' | 'OUT' | undefined) ?? null,
+      lastOccurredAt: latest ? isoRequired(latest.occurredAt) : null,
+    },
+    vehicles: employee.vehicles.map((vehicle) => ({
+      id: vehicle.id,
+      plate: vehicle.plate,
+      make: vehicle.make,
+      model: vehicle.model,
+      colour: vehicle.colour,
+      vehicleType: vehicle.vehicleType,
+    })),
   };
 }
 
@@ -92,16 +90,10 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
             { plate: { contains: q, mode: 'insensitive' } },
           ],
         },
-        select: { employeeId: true, guestId: true },
+        select: { employeeId: true },
         take: 100,
       });
-      const employeeIds = plateVehicles
-        .map((vehicle) => vehicle.employeeId)
-        .filter((id): id is string => Boolean(id));
-      const guestIds = plateVehicles
-        .map((vehicle) => vehicle.guestId)
-        .filter((id): id is string => Boolean(id));
-
+      const employeeIds = plateVehicles.map((vehicle) => vehicle.employeeId);
       const tokenWhere = terms.map((term) => ({
         OR: [
           { firstName: { contains: term, mode: 'insensitive' as const } },
@@ -109,69 +101,38 @@ export async function kioskRoutes(app: FastifyInstance): Promise<void> {
           { code: { contains: term, mode: 'insensitive' as const } },
         ],
       }));
-      const [employees, guests] = await Promise.all([
-        prisma.employee.findMany({
-          where: {
-            OR: [
-              ...(tokenWhere.length ? [{ AND: tokenWhere }] : []),
-              ...(employeeIds.length ? [{ id: { in: employeeIds } }] : []),
-            ],
-          },
-          include: {
-            events: {
-              where: { voidedAt: null, supersededById: null },
-              orderBy: { occurredAt: 'desc' },
-              take: 1,
-              select: { direction: true, occurredAt: true },
-            },
-            vehicles: VEHICLE_INCLUDE,
-          },
-          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-          take: 8,
-        }),
-        prisma.guest.findMany({
-          where: {
-            OR: [
-              { fullName: { contains: q, mode: 'insensitive' } },
-              ...(guestIds.length ? [{ id: { in: guestIds } }] : []),
-            ],
-          },
-          include: { vehicles: VEHICLE_INCLUDE },
-          orderBy: { fullName: 'asc' },
-          take: 8,
-        }),
-      ]);
 
-      return {
-        employees: employees.map((employee) => {
-          const latest = employee.events[0];
-          return {
-            kind: 'employee' as const,
-            id: employee.id,
-            code: employee.code,
-            fullName: `${employee.firstName} ${employee.lastName}`,
-            department: employee.department,
-            category: employee.category as 'staff' | 'contractor',
-            active: employee.active,
-            currentState: {
-              onCampus: latest?.direction === 'IN',
-              since:
-                latest?.direction === 'IN' ? isoRequired(latest.occurredAt) : null,
-              lastDirection: (latest?.direction as 'IN' | 'OUT' | undefined) ?? null,
-              lastOccurredAt: latest ? isoRequired(latest.occurredAt) : null,
-            },
-            vehicles: employee.vehicles.map(serializeVehicle),
-          };
-        }),
-        guests: guests.map((guest) => ({
-          kind: 'guest' as const,
-          id: guest.id,
-          fullName: guest.fullName,
-          company: guest.company,
-          active: guest.active,
-          vehicles: guest.vehicles.map(serializeVehicle),
-        })),
-      };
+      const employees = await prisma.employee.findMany({
+        where: {
+          active: true,
+          OR: [
+            ...(tokenWhere.length ? [{ AND: tokenWhere }] : []),
+            ...(employeeIds.length ? [{ id: { in: employeeIds } }] : []),
+          ],
+        },
+        include: EMPLOYEE_INCLUDE,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        take: 8,
+      });
+
+      return { employees: employees.map(serializeEmployee) };
+    },
+  );
+
+  typed.get(
+    '/kiosk/employees',
+    {
+      preHandler: [app.authenticate, app.requireAnyRole('HR', 'SECURITY')],
+      schema: { response: { 200: KioskEmployeeOptionsResponseSchema } },
+    },
+    async () => {
+      const employees = await prisma.employee.findMany({
+        where: { active: true },
+        include: EMPLOYEE_INCLUDE,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        take: 1000,
+      });
+      return { employees: employees.map(serializeEmployee) };
     },
   );
 }

@@ -1,11 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  KioskSearchResponse,
-  Vehicle,
-  VehicleDetail,
-  VehicleListResponse,
-} from '@alche/shared';
+import type { KioskSearchResponse, Vehicle, VehicleListResponse } from '@alche/shared';
 import { ApiError, apiFetch } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
@@ -32,13 +27,12 @@ import {
   useToast,
 } from '../components/ui';
 import { CarIcon, PlusIcon, SearchIcon } from '../components/icons';
-import { formatDateTime, formatTime } from '../lib/dates';
+import { formatDateTime } from '../lib/dates';
 
 interface VehicleForm {
   id?: string;
-  holderKind: 'employee' | 'guest';
-  holderId: string;
-  holderName: string;
+  employeeId: string;
+  employeeName: string;
   plate: string;
   make: string;
   model: string;
@@ -49,9 +43,8 @@ interface VehicleForm {
 }
 
 const emptyForm: VehicleForm = {
-  holderKind: 'employee',
-  holderId: '',
-  holderName: '',
+  employeeId: '',
+  employeeName: '',
   plate: '',
   make: '',
   model: '',
@@ -71,8 +64,8 @@ export function VehiclesPage() {
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<VehicleForm>(emptyForm);
-  const [holderSearch, setHolderSearch] = useState('');
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [detail, setDetail] = useState<Vehicle | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   const vehicles = useQuery({
@@ -83,17 +76,11 @@ export function VehiclesPage() {
       ),
   });
 
-  const holders = useQuery({
-    queryKey: ['vehicles', 'holder-search', holderSearch],
+  const employees = useQuery({
+    queryKey: ['vehicles', 'employee-search', employeeSearch],
     queryFn: () =>
-      apiFetch<KioskSearchResponse>(`/kiosk/search?q=${encodeURIComponent(holderSearch.trim())}`),
-    enabled: formOpen && holderSearch.trim().length >= 2 && !form.holderId,
-  });
-
-  const detail = useQuery({
-    queryKey: ['vehicles', 'detail', detailId],
-    queryFn: () => apiFetch<VehicleDetail>(`/vehicles/${detailId}`),
-    enabled: Boolean(detailId),
+      apiFetch<KioskSearchResponse>(`/kiosk/search?q=${encodeURIComponent(employeeSearch.trim())}`),
+    enabled: formOpen && employeeSearch.trim().length >= 2 && !form.employeeId,
   });
 
   const save = useMutation({
@@ -112,24 +99,17 @@ export function VehiclesPage() {
       }
       return apiFetch<Vehicle>('/vehicles', {
         method: 'POST',
-        body: {
-          ...body,
-          holderKind: form.holderKind,
-          holderId: form.holderId,
-        },
+        body: { ...body, employeeId: form.employeeId },
       });
     },
     onSuccess: async () => {
-      toast.push({ title: form.id ? 'Vehicle updated' : 'Vehicle registered', tone: 'success' });
+      toast.push({
+        title: form.id ? 'Vehicle updated' : 'Vehicle added',
+        tone: 'success',
+      });
       setFormOpen(false);
-      setForm(emptyForm);
-      setHolderSearch('');
       setFieldErrors({});
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['vehicles'] }),
-        queryClient.invalidateQueries({ queryKey: ['kiosk'] }),
-        queryClient.invalidateQueries({ queryKey: ['parking'] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
     },
     onError: (error) => {
       if (error instanceof ApiError) setFieldErrors(error.fieldErrors());
@@ -141,9 +121,25 @@ export function VehiclesPage() {
     },
   });
 
+  const deactivate = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/vehicles/${id}`, { method: 'PATCH', body: { active: false } }),
+    onSuccess: async () => {
+      toast.push({ title: 'Vehicle deactivated', tone: 'success' });
+      await queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+    },
+    onError: (error) => {
+      toast.push({
+        title: 'Could not deactivate vehicle',
+        message: error instanceof ApiError ? error.message : 'Try again.',
+        tone: 'error',
+      });
+    },
+  });
+
   const openCreate = () => {
     setForm(emptyForm);
-    setHolderSearch('');
+    setEmployeeSearch('');
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -151,9 +147,8 @@ export function VehiclesPage() {
   const openEdit = (vehicle: Vehicle) => {
     setForm({
       id: vehicle.id,
-      holderKind: vehicle.holder.kind === 'employee' ? 'employee' : 'guest',
-      holderId: vehicle.holder.id,
-      holderName: vehicle.holder.name,
+      employeeId: vehicle.holder.id,
+      employeeName: vehicle.holder.name,
       plate: vehicle.plate,
       make: vehicle.make ?? '',
       model: vehicle.model ?? '',
@@ -162,6 +157,7 @@ export function VehiclesPage() {
       notes: vehicle.notes ?? '',
       active: vehicle.active,
     });
+    setEmployeeSearch('');
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -173,127 +169,112 @@ export function VehiclesPage() {
   };
 
   return (
-    <div className="space-y-16">
-      <div>
-        <PageHeader
-          title="Vehicles"
-          description="One plate, one holder. Security can add a vehicle at the gate; HR maintains the full record."
-          actions={
-            <Button icon={<PlusIcon size={18} />} onClick={openCreate}>
-              Add vehicle
-            </Button>
-          }
-        />
-        <Card>
+    <div className="space-y-6">
+      <PageHeader
+        title="Vehicles"
+        description="Employees may have multiple vehicles. Number plates remain searchable at the kiosk."
+        actions={
+          <Button icon={<PlusIcon size={18} />} onClick={openCreate}>
+            Add vehicle
+          </Button>
+        }
+      />
+
+      <Card>
+        <div className="mb-4 max-w-md">
           <Input
-            label="Search by plate or holder"
+            label="Search"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
               setPage(1);
             }}
-            placeholder="AB 1234, Priya, GU 9080…"
+            placeholder="Plate, employee name or code"
             suffix={<SearchIcon size={20} />}
           />
-        </Card>
-      </div>
+        </div>
 
-      {vehicles.isLoading ? (
-        <Card>
-          <TableSkeleton rows={7} columns={6} />
-        </Card>
-      ) : vehicles.isError ? (
-        <ErrorState
-          title="Vehicles could not load."
-          description={vehicles.error instanceof ApiError ? vehicles.error.message : undefined}
-          onRetry={() => vehicles.refetch()}
-        />
-      ) : vehicles.data?.items.length === 0 ? (
-        <EmptyState
-          title="No vehicles match this search."
-          description="Register a vehicle from here, or while checking someone in at the kiosk."
-          action={
-            <Button icon={<PlusIcon size={18} />} onClick={openCreate}>
-              Add vehicle
-            </Button>
-          }
-        />
-      ) : (
-        <Card>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Plate</TH>
-                <TH>Holder</TH>
-                <TH>Vehicle</TH>
-                <TH>Parking</TH>
-                <TH>Last seen</TH>
-                <TH>Status</TH>
-                <TH>Actions</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {vehicles.data?.items.map((vehicle) => (
-                <TR key={vehicle.id}>
-                  <TD>
-                    <span className="inline-flex items-center gap-2 font-medium text-ink">
-                      <CarIcon size={18} />
-                      {vehicle.plate}
-                    </span>
-                    <span className="block text-caption text-slate">{vehicle.plateNorm}</span>
-                  </TD>
-                  <TD>
-                    {vehicle.holder.name}
-                    <span className="block text-caption text-slate">
-                      {vehicle.holder.kind}
-                    </span>
-                  </TD>
-                  <TD>
-                    {[vehicle.make, vehicle.model].filter(Boolean).join(' ') || '—'}
-                    <span className="block text-caption text-slate">
-                      {[vehicle.colour, vehicle.vehicleType].filter(Boolean).join(' · ')}
-                    </span>
-                  </TD>
-                  <TD>
-                    {vehicle.activeParking ? (
-                      <StatusPill tone="ON_SITE">
-                        {vehicle.activeParking.bayCode} · {vehicle.activeParking.areaName}
-                      </StatusPill>
-                    ) : (
-                      <StatusPill tone="INACTIVE">Not parked</StatusPill>
-                    )}
-                  </TD>
-                  <TD className="whitespace-nowrap">
-                    {vehicle.lastSeenAt ? formatDateTime(vehicle.lastSeenAt) : '—'}
-                  </TD>
-                  <TD>
-                    <StatusPill tone={vehicle.active ? 'PRESENT' : 'INACTIVE'}>
-                      {vehicle.active ? 'ACTIVE' : 'INACTIVE'}
-                    </StatusPill>
-                  </TD>
-                  <TD>
-                    <div className="flex flex-wrap gap-1">
-                      <Button variant="text" size="sm" onClick={() => setDetailId(vehicle.id)}>
-                        View
-                      </Button>
-                      {isHr ? (
-                        <Button variant="text" size="sm" onClick={() => openEdit(vehicle)}>
-                          Edit
-                        </Button>
-                      ) : null}
-                    </div>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-          <Pagination
-            page={vehicles.data?.meta.page ?? 1}
-            totalPages={vehicles.data?.meta.totalPages ?? 1}
-            onPage={setPage}
+        {vehicles.isLoading ? (
+          <TableSkeleton rows={8} columns={5} />
+        ) : vehicles.isError ? (
+          <ErrorState title="Vehicles could not load." onRetry={() => vehicles.refetch()} />
+        ) : vehicles.data?.items.length === 0 ? (
+          <EmptyState
+            title="No vehicles match this search."
+            description="Add a vehicle and assign it to an employee."
           />
-        </Card>
-      )}
+        ) : (
+          <>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Vehicle</TH>
+                  <TH>Employee</TH>
+                  <TH>Type</TH>
+                  <TH>Status</TH>
+                  <TH>Actions</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {vehicles.data?.items.map((vehicle) => (
+                  <TR key={vehicle.id}>
+                    <TD>
+                      <div className="flex items-center gap-2">
+                        <CarIcon size={18} />
+                        <span>
+                          <span className="block font-medium text-ink">{vehicle.plate}</span>
+                          <span className="block text-caption text-slate">
+                            {[vehicle.make, vehicle.model, vehicle.colour].filter(Boolean).join(' · ') ||
+                              '—'}
+                          </span>
+                        </span>
+                      </div>
+                    </TD>
+                    <TD>{vehicle.holder.name}</TD>
+                    <TD>
+                      <Badge>{vehicle.vehicleType}</Badge>
+                    </TD>
+                    <TD>
+                      <StatusPill tone={vehicle.active ? 'PRESENT' : 'INACTIVE'}>
+                        {vehicle.active ? 'ACTIVE' : 'INACTIVE'}
+                      </StatusPill>
+                    </TD>
+                    <TD>
+                      <div className="flex flex-wrap gap-1">
+                        <Button variant="text" size="sm" onClick={() => setDetail(vehicle)}>
+                          View
+                        </Button>
+                        {isHr ? (
+                          <>
+                            <Button variant="text" size="sm" onClick={() => openEdit(vehicle)}>
+                              Edit
+                            </Button>
+                            {vehicle.active ? (
+                              <Button
+                                variant="text"
+                                size="sm"
+                                loading={deactivate.isPending}
+                                onClick={() => deactivate.mutate(vehicle.id)}
+                              >
+                                Deactivate
+                              </Button>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+            <Pagination
+              page={vehicles.data?.meta.page ?? 1}
+              totalPages={vehicles.data?.meta.totalPages ?? 1}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </Card>
 
       <Modal
         open={formOpen}
@@ -301,8 +282,8 @@ export function VehiclesPage() {
         title={form.id ? 'Edit vehicle' : 'Add vehicle'}
         description={
           form.id
-            ? 'HR can change the full record. The holder cannot be moved between people.'
-            : 'Register the vehicle against exactly one employee or guest.'
+            ? 'Update the vehicle record. Its employee cannot be changed.'
+            : 'Register another vehicle for an employee.'
         }
         size="lg"
         footer={
@@ -314,9 +295,9 @@ export function VehiclesPage() {
               type="submit"
               form="vehicle-form"
               loading={save.isPending}
-              disabled={!form.plate || (!form.id && !form.holderId)}
+              disabled={!form.plate || (!form.id && !form.employeeId)}
             >
-              {form.id ? 'Save changes' : 'Register vehicle'}
+              {form.id ? 'Save changes' : 'Add vehicle'}
             </Button>
           </>
         }
@@ -324,67 +305,45 @@ export function VehiclesPage() {
         <form id="vehicle-form" onSubmit={submit} className="space-y-4">
           {!form.id ? (
             <>
-              <Select
-                label="Holder type"
-                value={form.holderKind}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    holderKind: event.target.value as VehicleForm['holderKind'],
-                    holderId: '',
-                    holderName: '',
-                  })
-                }
-                options={[
-                  { value: 'employee', label: 'Employee' },
-                  { value: 'guest', label: 'Guest' },
-                ]}
-              />
               <Input
-                label="Find holder"
-                value={form.holderId ? form.holderName : holderSearch}
+                label="Find employee"
+                value={form.employeeId ? form.employeeName : employeeSearch}
                 onChange={(event) => {
-                  setHolderSearch(event.target.value);
-                  setForm({ ...form, holderId: '', holderName: '' });
+                  setEmployeeSearch(event.target.value);
+                  setForm({ ...form, employeeId: '', employeeName: '' });
                 }}
-                placeholder="Search name or code"
-                error={fieldErrors.holderId}
+                placeholder="Search name, code or department"
+                error={fieldErrors.employeeId}
                 required
               />
-              {!form.holderId && holderSearch.trim().length >= 2 ? (
+              {!form.employeeId && employeeSearch.trim().length >= 2 ? (
                 <div className="max-h-56 overflow-y-auto rounded-md border border-mist">
-                  {holders.isLoading ? (
+                  {employees.isLoading ? (
                     <p className="p-3 text-body-sm text-slate">Searching…</p>
                   ) : (
                     <>
-                      {(form.holderKind === 'employee'
-                        ? holders.data?.employees ?? []
-                        : holders.data?.guests ?? []
-                      ).map((holder) => {
-                        const name = holder.fullName;
-                        return (
-                          <button
-                            key={holder.id}
-                            type="button"
-                            className="flex min-h-12 w-full items-center justify-between border-b border-mist px-3 text-left last:border-0 hover:bg-cloud"
-                            onClick={() => {
-                              setForm({
-                                ...form,
-                                holderId: holder.id,
-                                holderName: name,
-                              });
-                              setHolderSearch(name);
-                            }}
-                          >
-                            <span className="text-body-sm text-ink">{name}</span>
-                            <Badge>{holder.kind}</Badge>
-                          </button>
-                        );
-                      })}
-                      {(form.holderKind === 'employee'
-                        ? holders.data?.employees.length
-                        : holders.data?.guests.length) === 0 ? (
-                        <p className="p-3 text-body-sm text-slate">No matching holder.</p>
+                      {(employees.data?.employees ?? []).map((employee) => (
+                        <button
+                          key={employee.id}
+                          type="button"
+                          className="flex min-h-12 w-full items-center justify-between border-b border-mist px-3 text-left last:border-0 hover:bg-cloud"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              employeeId: employee.id,
+                              employeeName: employee.fullName,
+                            });
+                            setEmployeeSearch(employee.fullName);
+                          }}
+                        >
+                          <span className="text-body-sm text-ink">{employee.fullName}</span>
+                          <span className="text-caption text-slate">
+                            {employee.code} · {employee.department}
+                          </span>
+                        </button>
+                      ))}
+                      {(employees.data?.employees.length ?? 0) === 0 ? (
+                        <p className="p-3 text-body-sm text-slate">No matching employee.</p>
                       ) : null}
                     </>
                   )}
@@ -393,32 +352,18 @@ export function VehiclesPage() {
             </>
           ) : (
             <p className="rounded-md bg-cloud px-3 py-2 text-body-sm text-slate">
-              Holder: <strong className="text-ink">{form.holderName}</strong>
+              Employee: <strong className="text-ink">{form.employeeName}</strong>
             </p>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label="Plate"
-              value={form.plate}
-              onChange={(event) => setForm({ ...form, plate: event.target.value })}
-              placeholder="AB 1234"
-              error={fieldErrors.plate}
-              required
-            />
-            <Select
-              label="Vehicle type"
-              value={form.vehicleType}
-              onChange={(event) =>
-                setForm({ ...form, vehicleType: event.target.value as VehicleForm['vehicleType'] })
-              }
-              options={[
-                { value: 'car', label: 'Car' },
-                { value: 'motorbike', label: 'Motorbike' },
-                { value: 'van', label: 'Van' },
-                { value: 'other', label: 'Other' },
-              ]}
-            />
+          <Input
+            label="Plate"
+            value={form.plate}
+            onChange={(event) => setForm({ ...form, plate: event.target.value })}
+            error={fieldErrors.plate}
+            required
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Make"
               value={form.make}
@@ -435,12 +380,19 @@ export function VehiclesPage() {
               onChange={(event) => setForm({ ...form, colour: event.target.value })}
             />
             <Select
-              label="Status"
-              value={form.active ? 'true' : 'false'}
-              onChange={(event) => setForm({ ...form, active: event.target.value === 'true' })}
+              label="Type"
+              value={form.vehicleType}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  vehicleType: event.target.value as VehicleForm['vehicleType'],
+                })
+              }
               options={[
-                { value: 'true', label: 'Active' },
-                { value: 'false', label: 'Inactive' },
+                { value: 'car', label: 'Car' },
+                { value: 'motorbike', label: 'Motorbike' },
+                { value: 'van', label: 'Van' },
+                { value: 'other', label: 'Other' },
               ]}
             />
           </div>
@@ -448,75 +400,54 @@ export function VehiclesPage() {
             label="Notes"
             value={form.notes}
             onChange={(event) => setForm({ ...form, notes: event.target.value })}
+            rows={3}
+          />
+          <Select
+            label="Status"
+            value={form.active ? 'true' : 'false'}
+            onChange={(event) => setForm({ ...form, active: event.target.value === 'true' })}
+            options={[
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ]}
           />
         </form>
       </Modal>
 
       <Modal
-        open={Boolean(detailId)}
-        onClose={() => setDetailId(null)}
-        title={detail.data ? `${detail.data.plate} · ${detail.data.holder.name}` : 'Vehicle detail'}
-        description={
-          detail.data
-            ? [detail.data.make, detail.data.model, detail.data.colour]
-                .filter(Boolean)
-                .join(' · ')
-            : undefined
-        }
-        size="lg"
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title={detail?.plate ?? 'Vehicle'}
+        description={detail?.holder.name}
       >
-        {detail.isLoading ? (
-          <TableSkeleton rows={4} columns={4} />
-        ) : detail.isError ? (
-          <ErrorState title="Vehicle detail could not load." onRetry={() => detail.refetch()} />
-        ) : detail.data ? (
-          <>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <StatusPill tone={detail.data.active ? 'PRESENT' : 'INACTIVE'}>
-                {detail.data.active ? 'ACTIVE' : 'INACTIVE'}
-              </StatusPill>
-              <Badge>{detail.data.holder.kind}</Badge>
-              <Badge>{detail.data.vehicleType}</Badge>
-              {detail.data.activeParking ? (
-                <StatusPill tone="ON_SITE">
-                  PARKED {detail.data.activeParking.bayCode} · {detail.data.activeParking.areaName}
-                </StatusPill>
-              ) : null}
+        {detail ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md bg-cloud p-3">
+                <p className="text-caption uppercase tracking-caption text-slate">Type</p>
+                <p className="text-body-sm text-ink">{detail.vehicleType}</p>
+              </div>
+              <div className="rounded-md bg-cloud p-3">
+                <p className="text-caption uppercase tracking-caption text-slate">Status</p>
+                <p className="text-body-sm text-ink">{detail.active ? 'Active' : 'Inactive'}</p>
+              </div>
+              <div className="rounded-md bg-cloud p-3">
+                <p className="text-caption uppercase tracking-caption text-slate">Make / model</p>
+                <p className="text-body-sm text-ink">
+                  {[detail.make, detail.model].filter(Boolean).join(' · ') || '—'}
+                </p>
+              </div>
+              <div className="rounded-md bg-cloud p-3">
+                <p className="text-caption uppercase tracking-caption text-slate">Colour</p>
+                <p className="text-body-sm text-ink">{detail.colour ?? '—'}</p>
+              </div>
             </div>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Bay</TH>
-                  <TH>Started</TH>
-                  <TH>Ended</TH>
-                  <TH>Minutes</TH>
-                  <TH>Override</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {detail.data.history.length === 0 ? (
-                  <TR>
-                    <TD colSpan={5} className="text-slate">
-                      No parking history yet.
-                    </TD>
-                  </TR>
-                ) : (
-                  detail.data.history.map((row) => (
-                    <TR key={row.sessionId}>
-                      <TD>
-                        {row.bayCode}
-                        <span className="block text-caption text-slate">{row.areaName}</span>
-                      </TD>
-                      <TD>{formatTime(row.startedAt)}</TD>
-                      <TD>{row.endedAt ? formatTime(row.endedAt) : 'Active'}</TD>
-                      <TD>{row.minutes ?? '—'}</TD>
-                      <TD>{row.overrideReason ?? '—'}</TD>
-                    </TR>
-                  ))
-                )}
-              </TBody>
-            </Table>
-          </>
+            <div className="rounded-md bg-cloud p-3">
+              <p className="text-caption uppercase tracking-caption text-slate">Notes</p>
+              <p className="text-body-sm text-ink">{detail.notes ?? '—'}</p>
+            </div>
+            <p className="text-caption text-slate">Added {formatDateTime(detail.createdAt)}</p>
+          </div>
         ) : null}
       </Modal>
     </div>

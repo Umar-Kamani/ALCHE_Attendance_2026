@@ -70,124 +70,19 @@ const PROBES: Probe[] = [
     body: { jobTitle: 'Probe' },
   },
   { method: 'POST', url: '/api/v1/employees/import?dryRun=true', allowed: ['HR'], multipart: EMPTY_CSV },
-  { method: 'GET', url: '/api/v1/guests', allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/guests',
-    allowed: ['SECURITY', 'HR'],
-    body: { fullName: 'Role Probe' },
-  },
-  { method: 'GET', url: `/api/v1/guests/${ID}`, allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'PATCH',
-    url: `/api/v1/guests/${ID}`,
-    allowed: ['SECURITY', 'HR'],
-    body: { company: 'Probe Co' },
-  },
-  { method: 'GET', url: `/api/v1/guest-visits?date=${TODAY}`, allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/guest-visits',
-    allowed: ['SECURITY', 'HR'],
-    body: {
-      guestId: ID,
-      hostEmployeeId: ID,
-      purpose: 'Role probe',
-      expectedFrom: new Date().toISOString(),
-      expectedTo: new Date(Date.now() + 3_600_000).toISOString(),
-    },
-  },
-  {
-    method: 'POST',
-    url: `/api/v1/guest-visits/${ID}/check-in`,
-    allowed: ['SECURITY', 'HR'],
-    body: {},
-  },
-  {
-    method: 'POST',
-    url: `/api/v1/guest-visits/${ID}/check-out`,
-    allowed: ['SECURITY', 'HR'],
-    body: { releaseParking: false },
-  },
-  {
-    method: 'GET',
-    url: `/api/v1/guest-visits/export.csv?from=${TODAY}&to=${TODAY}`,
-    allowed: ['SECURITY', 'HR'],
-  },
   { method: 'GET', url: '/api/v1/vehicles', allowed: ['SECURITY', 'HR'] },
   { method: 'GET', url: `/api/v1/vehicles/${ID}`, allowed: ['SECURITY', 'HR'] },
   {
     method: 'POST',
     url: '/api/v1/vehicles',
     allowed: ['SECURITY', 'HR'],
-    body: { plate: 'RP 1000', holderKind: 'employee', holderId: ID },
+    body: { plate: 'RP 1000', employeeId: ID },
   },
   {
     method: 'PATCH',
     url: `/api/v1/vehicles/${ID}`,
     allowed: ['HR'],
     body: { colour: 'Blue' },
-  },
-  { method: 'GET', url: '/api/v1/parking/areas', allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/parking/areas',
-    allowed: ['SECURITY'],
-    body: { name: 'Role Probe Lot', code: 'ROLEPROBE' },
-  },
-  {
-    method: 'PATCH',
-    url: `/api/v1/parking/areas/${ID}`,
-    allowed: ['SECURITY'],
-    body: { name: 'Probe' },
-  },
-  { method: 'GET', url: '/api/v1/parking/bays', allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/parking/bays',
-    allowed: ['SECURITY'],
-    body: { areaId: ID, code: 'R-01', bayType: 'GENERAL' },
-  },
-  {
-    method: 'PATCH',
-    url: `/api/v1/parking/bays/${ID}`,
-    allowed: ['SECURITY'],
-    body: { active: false },
-  },
-  {
-    method: 'POST',
-    url: '/api/v1/parking/bays/bulk',
-    allowed: ['SECURITY'],
-    body: { areaId: ID, prefix: 'R-', from: 1, to: 2, bayType: 'GENERAL' },
-  },
-  { method: 'GET', url: '/api/v1/parking/board', allowed: ['SECURITY', 'HR'] },
-  {
-    method: 'POST',
-    url: '/api/v1/parking/sessions',
-    allowed: ['SECURITY'],
-    body: { vehicleId: ID, autoAssign: true },
-  },
-  {
-    method: 'POST',
-    url: `/api/v1/parking/sessions/${ID}/release`,
-    allowed: ['SECURITY'],
-    body: {},
-  },
-  {
-    method: 'POST',
-    url: `/api/v1/parking/sessions/${ID}/relocate`,
-    allowed: ['SECURITY'],
-    body: { autoAssign: true },
-  },
-  {
-    method: 'GET',
-    url: `/api/v1/parking/history?from=${TODAY}&to=${TODAY}`,
-    allowed: ['SECURITY', 'HR'],
-  },
-  {
-    method: 'GET',
-    url: `/api/v1/parking/export.csv?from=${TODAY}&to=${TODAY}`,
-    allowed: ['SECURITY', 'HR'],
   },
   { method: 'GET', url: '/api/v1/tickets', allowed: ['SECURITY', 'HR'] },
   {
@@ -285,7 +180,7 @@ describe('role matrix — every route', () => {
   });
 
   it('is exercised by a complete probe table', () => {
-    expect(PROBES.length).toBeGreaterThanOrEqual(54);
+    expect(PROBES.length).toBeGreaterThanOrEqual(32);
   });
 
   for (const probe of PROBES) {

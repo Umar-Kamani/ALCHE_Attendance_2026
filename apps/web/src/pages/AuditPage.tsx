@@ -75,7 +75,7 @@ export function AuditPage() {
               label="Entity type"
               value={entity}
               onChange={(event) => setEntity(event.target.value)}
-              placeholder="event, ticket, parking_session…"
+              placeholder="event, ticket, user, vehicle…"
             />
             <Select
               label="Actor"

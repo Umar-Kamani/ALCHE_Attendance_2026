@@ -159,11 +159,14 @@ test.describe('visual and design fidelity', () => {
       await login(page, 'e2e.hr');
 
       await page.goto('/kiosk');
-      await page.getByRole('combobox').fill('Vera Visual');
+      const employeeSearch = page.getByRole('combobox', {
+        name: 'Search employees and vehicles',
+      });
+      await employeeSearch.fill('Vera Visual');
       const result = page.getByRole('option', { name: /Vera Visual/ });
       await expect(result).toBeVisible();
       await result.click();
-      await page.getByRole('combobox').fill('');
+      await employeeSearch.fill('');
       await expect(page.getByText('Off campus, last left 17:12')).toBeVisible();
       await page.getByTestId('on-campus-count').evaluate((element) => {
         (element as HTMLElement).style.display = 'none';
@@ -174,15 +177,6 @@ test.describe('visual and design fidelity', () => {
       await hideDynamicChrome(page);
       await page.waitForLoadState('networkidle');
       await expect(page).toHaveScreenshot(`kiosk-${viewport.width}.png`);
-
-      await page.goto('/parking');
-      await page.getByLabel('Area').selectOption({ label: 'Visual Lot' });
-      await expect(page.getByLabel('Z-01, Staff bay, occupied')).toBeVisible();
-      await expect(page.getByLabel('Z-02, Staff bay, free')).toBeVisible();
-      await page.getByLabel('Z-01, Staff bay, occupied').scrollIntoViewIfNeeded();
-      await hideDynamicChrome(page);
-      await page.waitForLoadState('networkidle');
-      await expect(page).toHaveScreenshot(`parking-${viewport.width}.png`);
 
       await filterVisualAttendance(page);
       await hideDynamicChrome(page);

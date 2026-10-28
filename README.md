@@ -1,12 +1,8 @@
 # ALCHE Campus Post
 
-A self-hosted attendance, guest and parking system for the ALCHE gate and HR office in Pamplemousses, Mauritius.
+A self-hosted employee attendance and vehicle register for the ALCHE gate and HR office in Pamplemousses, Mauritius.
 
-It replaces three paper processes:
-
-- the staff entry/exit logbook, with an immutable attendance event stream;
-- hand-written visitor slips, with a guest register and one-tap check-in/out;
-- the parking notebook, with typed bays, live occupancy and auditable allocation.
+It replaces the paper staff entry/exit logbook with an immutable attendance event stream and keeps a searchable register of employee vehicles.
 
 Everything runs on the campus LAN. There are no cloud services, telemetry calls, runtime CDNs or external font requests.
 
@@ -49,7 +45,7 @@ With the stack running:
 make seed-demo
 ```
 
-This is idempotent and creates approximately 15 staff, 6 guests, 11 vehicles, 2 demonstration areas with 40 typed bays, 30+ days of events, 9 active parking sessions, one approved amendment and one open ticket. It prints the one-time passwords for the demo security and dean accounts. Re-running it does not duplicate data and does not reset existing demo passwords.
+This is idempotent and creates approximately 15 staff, 8 employee vehicles, 30+ days of attendance events, one approved amendment and one open ticket. It prints the one-time passwords for the demo security and dean accounts. Re-running it does not duplicate data and does not reset existing demo passwords.
 
 To run the automated browser checks against the demo database:
 
@@ -66,9 +62,9 @@ This starts the stack, seeds the demo data, installs the isolated E2E fixtures a
 
 | Role | Main work |
 |---|---|
-| **SECURITY** | Kiosk in/out with inline parking, today’s attendance, guests, vehicles, live parking board, bay inventory, parking history, raise/view own amendment tickets |
-| **HR** | Everything operational plus the employee directory, imports, full attendance history, employee detail and corrections, exports, user accounts, audit log; parking is read-only |
-| **DEAN** | Read-only aggregate dashboard: today’s snapshot, current-month totals, guest flow, parking occupancy and a 30-day attendance trend. No names, guest PII, exports or mutations |
+| **SECURITY** | Kiosk in/out with a searchable employee dropdown, today’s attendance, on-campus board, employee vehicles, raise/view own amendment tickets |
+| **HR** | Everything operational plus the employee directory, imports, full attendance history, employee detail and corrections, exports, user accounts and audit log |
+| **DEAN** | Read-only aggregate employee attendance dashboard: today’s snapshot, current-month totals and a 30-day trend. No names, exports or mutations |
 
 The server enforces the role matrix on every `/api/v1` route. Hiding a button is never the authorisation.
 
@@ -78,35 +74,15 @@ The server enforces the role matrix on every `/api/v1` route. Hiding a button is
 
 ### Gate kiosk
 
-1. Search by name, employee code or number plate.
-2. Select the person. The current state and vehicles appear.
+1. Use the searchable **Select employee** dropdown, or search by name, employee code or number plate.
+2. Select the employee. The current state and all their vehicles appear.
 3. One primary action is inferred: **Mark IN** or **Mark OUT**. A text toggle handles exceptions.
-4. **Change time** allows a Mauritius-local override for the event. The server rejects times before the employee’s latest event; parking starts or ends at the chosen time.
-5. If checking in and vehicles are registered, choose the vehicle and a free matching bay. “No parking” never blocks attendance.
-6. Marking OUT automatically releases the employee’s active parking session and confirms the released bay.
-7. A double tap cannot double-log: the request is disabled while in flight, and the server rejects the same direction within 120 seconds.
-8. Undo is available only for the event the signed-in officer created, for five minutes, and is audited as `gate_undo`.
-9. If the staff member has no vehicle, **Add vehicle** registers one at the gate.
+4. **Change time** allows a Mauritius-local override for the event. The server rejects times before the employee’s latest event.
+5. A double tap cannot double-log: the request is disabled while in flight, and the server rejects the same direction within 120 seconds.
+6. Undo is available only for the event the signed-in officer created, for five minutes, and is audited as `gate_undo`.
+7. If the employee has no vehicle, **Add vehicle** registers one at the gate. Employees may have multiple vehicles.
 
 The kiosk also shows today’s activity and the current on-campus count.
-
-### Guests
-
-- **Today** shows expected, on-site, overdue and departed visits.
-- **Check in walk-in** creates a guest and visit and checks them in immediately.
-- **Pre-register visit** records a future expected window.
-- Guest check-out can release the parking bay in the same action.
-- The **Register** tab filters by date, host and status and exports a filtered CSV.
-- The **Guest directory** keeps one guest record across repeat visits. Deactivating a guest never deletes their visits.
-
-### Parking
-
-- **Parking board** groups bays by area. Every bay shows its code and a type chip (`S`, `G`, `Gen`, `Acc`, `M`); occupancy is also written in words/plates, never colour alone.
-- Auto-assign chooses the lowest-numbered free matching bay, then falls back to `GENERAL`. It never falls into a reserved type.
-- A mismatched allocation is refused with `422` until a typed reason is entered; the session is badged as an override and the action is audited.
-- A bay and a vehicle each have at most one active session, enforced by PostgreSQL partial unique indexes. A holder also has only one active parking session across all their vehicles.
-- Relocation ends the old session and opens the new one in one transaction.
-- **Parking history** reports daily peak occupancy and average dwell by area and type.
 
 ### Attendance and corrections
 
@@ -196,7 +172,7 @@ The application and database are **not** on the gate PC. Any browser can be the 
 
 1. Move a spare PC/tablet to the gate and open `http://<server>:8000` (or `https://alche.lan`).
 2. Sign in with the shared gate officer account, or ask HR to issue a new one.
-3. Nothing is lost: the event stream, guests and parking sessions are in PostgreSQL on the server.
+3. Nothing is lost: the attendance event stream and employee vehicle records are in PostgreSQL on the server.
 
 If the **server** dies:
 
@@ -230,7 +206,7 @@ The default test URL is `postgresql://alche:alche@127.0.0.1:5432/alche_test?sche
 pnpm test:web
 ```
 
-Uses Vitest + React Testing Library with happy-dom. The suite checks kiosk direction inference and in-flight blocking, parking-board free/occupied rendering, the ineligible-bay override guard, and the raw-colour design restriction.
+Uses Vitest + React Testing Library with happy-dom. The suite checks kiosk direction inference and in-flight blocking, the employee-only on-campus table, modal focus handling and the raw-colour design restriction.
 
 ### Everything
 
@@ -252,7 +228,7 @@ or, against an already-running stack with fixtures:
 pnpm e2e
 ```
 
-Playwright covers the full acceptance flows and takes screenshot baselines of the kiosk, parking board and attendance table at **1366×768** and **1024×768**. Baselines are committed under `e2e/visual.spec.ts-snapshots/`. The report is in `playwright-report/`.
+Playwright covers the full acceptance flows and takes screenshot baselines of the kiosk and attendance table at **1366×768** and **1024×768**. Baselines are committed under `e2e/visual.spec.ts-snapshots/`. The report is in `playwright-report/`.
 
 Screenshots are taken after the visual fixtures are installed, and intentionally hide dynamic kiosk activity and open-ticket counters so the layout baseline is stable.
 
@@ -313,12 +289,10 @@ make reset-password USER=admin
 
 **Login says the account is locked.** Wait 15 minutes, or ask HR to reset the password; the five-failure lockout is per username.
 
-**The browser shows a 403 page.** The account is valid but lacks that capability. Security cannot see full attendance, employee directories, exports of attendance, users or audit. HR can approve tickets, but parking allocation and bay changes are security-only.
-
-**Visitors cannot sign in.** Guests never receive accounts. Security checks them in from the Guests screen.
+**The browser shows a 403 page.** The account is valid but lacks that capability. Security cannot see full attendance, the employee directory, attendance exports, users or audit. HR can approve amendment tickets.
 
 **No suitable bay is free.** Auto-assign only considers matching and `GENERAL` bays. Allocate a reserved bay only with a typed reason; the session will be badged as an override.
 
 **Do I need an internet connection?** No after the image and dependencies are built. Poppins is bundled in the app assets. There is no runtime font/CDN/telemetry request.
 
-**How long is data kept?** The deployment keeps attendance, guest and parking history for at least seven years; there is no automatic purge. Keep the 30 daily backups and archive them according to ALCHE’s retention policy.
+**How long is data kept?** The deployment keeps attendance and employee vehicle history for at least seven years; there is no automatic purge. Keep the 30 daily backups and archive them according to ALCHE’s retention policy.

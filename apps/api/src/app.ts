@@ -18,8 +18,6 @@ import { attendanceRoutes } from './routes/attendance.js';
 import { kioskRoutes } from './routes/kiosk.js';
 import { ticketRoutes } from './routes/tickets.js';
 import { vehicleRoutes } from './routes/vehicles.js';
-import { guestRoutes } from './routes/guests.js';
-import { parkingRoutes } from './routes/parking.js';
 import { adminRoutes } from './routes/admin.js';
 
 export async function buildApp(options: { logger?: boolean } = {}): Promise<FastifyInstance> {
@@ -111,8 +109,6 @@ export async function buildApp(options: { logger?: boolean } = {}): Promise<Fast
   await app.register(kioskRoutes, { prefix: '/api/v1' });
   await app.register(ticketRoutes, { prefix: '/api/v1' });
   await app.register(vehicleRoutes, { prefix: '/api/v1' });
-  await app.register(guestRoutes, { prefix: '/api/v1' });
-  await app.register(parkingRoutes, { prefix: '/api/v1' });
   await app.register(adminRoutes, { prefix: '/api/v1' });
 
   const publicDir = resolve(config.publicDir);

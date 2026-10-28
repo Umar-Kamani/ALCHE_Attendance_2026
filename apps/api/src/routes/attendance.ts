@@ -288,99 +288,35 @@ export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      const result = await prisma.$transaction(async (tx) => {
-        const event = await tx.event.create({
-          data: {
-            employeeId: employee.id,
-            occurredAt,
-            direction,
-            recordedBy: request.authUser!.id,
-            source: request.body.hrEdit ? 'hr_edit' : 'gate',
-            note: request.body.note ?? null,
-          },
-          include: EVENT_INCLUDE,
-        });
-
-        const activeSessions =
-          direction === 'OUT'
-            ? await tx.parkingSession.findMany({
-                where: {
-                  endedAt: null,
-                  vehicle: { employeeId: employee.id },
-                },
-                include: { bay: { include: { area: true } } },
-                orderBy: { startedAt: 'asc' },
-              })
-            : [];
-
-        const tooEarly = activeSessions.find((session) => session.startedAt > occurredAt);
-        if (tooEarly) {
-          throw unprocessable(
-            `${employee.firstName} ${employee.lastName} is parked in ${tooEarly.bay.code}, but that session started after the chosen OUT time. Choose a later time or release the bay from the parking board.`,
-          );
-        }
-
-        if (activeSessions.length > 0) {
-          await tx.parkingSession.updateMany({
-            where: { id: { in: activeSessions.map((session) => session.id) } },
-            data: {
-              endedAt: occurredAt,
-              endedBy: request.authUser!.id,
-              endReason: 'gate_release',
-            },
-          });
-        }
-
-        return { event, activeSessions };
+      const event = await prisma.event.create({
+        data: {
+          employeeId: employee.id,
+          occurredAt,
+          direction,
+          recordedBy: request.authUser!.id,
+          source: request.body.hrEdit ? 'hr_edit' : 'gate',
+          note: request.body.note ?? null,
+        },
+        include: EVENT_INCLUDE,
       });
 
       await audit(request, {
         action: request.body.hrEdit ? 'event.hr_create' : 'event.create',
         entityType: 'event',
-        entityId: result.event.id,
-        after: serializeEvent(result.event),
+        entityId: event.id,
+        after: serializeEvent(event),
         reason: request.body.reason ?? request.body.note ?? null,
       });
 
-      for (const session of result.activeSessions) {
-        await audit(request, {
-          action: 'parking.release',
-          entityType: 'parking_session',
-          entityId: session.id,
-          before: {
-            bayId: session.bayId,
-            vehicleId: session.vehicleId,
-            startedAt: isoRequired(session.startedAt),
-            endedAt: null,
-          },
-          after: {
-            bayCode: session.bay.code,
-            endedAt: isoRequired(occurredAt),
-            endReason: 'gate_release',
-          },
-          reason: 'Employee marked OUT',
-        });
-      }
-
-      const releasedSessions = result.activeSessions.map((session) => ({
-        sessionId: session.id,
-        bayId: session.bayId,
-        bayCode: session.bay.code,
-        areaName: session.bay.area.name,
-        plate: session.plateSnapshot,
-        endedAt: isoRequired(occurredAt),
-      }));
-
-      const undoUntil = new Date(result.event.createdAt.getTime() + 5 * 60_000);
+      const undoUntil = new Date(event.createdAt.getTime() + 5 * 60_000);
       reply.status(201);
       return {
-        event: serializeEvent(result.event),
+        event: serializeEvent(event),
         inferredDirection,
-        releasedSessions,
         undoUntil: isoRequired(undoUntil),
         employeeState: {
           onCampus: direction === 'IN',
-          since: direction === 'IN' ? isoRequired(result.event.occurredAt) : null,
+          since: direction === 'IN' ? isoRequired(event.occurredAt) : null,
         },
       };
     },

@@ -17,17 +17,13 @@ import {
   VEHICLE_INCLUDE,
   normalizePlate,
   serializeVehicle,
-  sessionHistory,
 } from '../serializers/vehicles.js';
 
-async function resolveHolder(kind: 'employee' | 'guest', id: string) {
-  const holder =
-    kind === 'employee'
-      ? await prisma.employee.findUnique({ where: { id } })
-      : await prisma.guest.findUnique({ where: { id } });
-  if (!holder) throw notFound('That vehicle holder does not exist.');
-  if (!holder.active) throw unprocessable('That holder is inactive.');
-  return holder;
+async function resolveEmployee(id: string) {
+  const employee = await prisma.employee.findUnique({ where: { id } });
+  if (!employee) throw notFound('That employee does not exist.');
+  if (!employee.active) throw unprocessable('That employee is inactive.');
+  return employee;
 }
 
 async function plateConflict(plateNorm: string, excludeId?: string) {
@@ -37,12 +33,10 @@ async function plateConflict(plateNorm: string, excludeId?: string) {
       active: true,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
-    include: { employee: true, guest: true },
+    include: { employee: true },
   });
   if (existing) {
-    const holder = existing.employee
-      ? `${existing.employee.firstName} ${existing.employee.lastName}`
-      : (existing.guest?.fullName ?? 'another holder');
+    const holder = `${existing.employee.firstName} ${existing.employee.lastName}`;
     throw conflict(
       'PLATE_TAKEN',
       `${existing.plate} is registered to ${holder}.`,
@@ -73,15 +67,10 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
                 { plate: { contains: q, mode: 'insensitive' as const } },
                 { employee: { firstName: { contains: q, mode: 'insensitive' as const } } },
                 { employee: { lastName: { contains: q, mode: 'insensitive' as const } } },
-                { guest: { fullName: { contains: q, mode: 'insensitive' as const } } },
+                { employee: { code: { contains: q, mode: 'insensitive' as const } } },
               ],
             }
           : {}),
-        ...(request.query.holderKind === 'employee'
-          ? { employeeId: { not: null } }
-          : request.query.holderKind === 'guest'
-            ? { guestId: { not: null } }
-            : {}),
       };
       const [vehicles, total] = await Promise.all([
         prisma.vehicle.findMany({
@@ -111,10 +100,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
         include: VEHICLE_INCLUDE,
       });
       if (!vehicle) throw notFound('Vehicle not found.');
-      return {
-        ...serializeVehicle(vehicle),
-        history: sessionHistory(vehicle),
-      };
+      return serializeVehicle(vehicle);
     },
   );
 
@@ -125,7 +111,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: CreateVehicleBodySchema, response: { 201: VehicleSchema } },
     },
     async (request, reply) => {
-      await resolveHolder(request.body.holderKind, request.body.holderId);
+      await resolveEmployee(request.body.employeeId);
       const plateNorm = normalizePlate(request.body.plate);
       if (plateNorm.length < 2) throw unprocessable('Enter a valid number plate.');
       if (request.body.active) await plateConflict(plateNorm);
@@ -140,8 +126,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
           vehicleType: request.body.vehicleType,
           active: request.body.active,
           notes: request.body.notes ?? null,
-          employeeId: request.body.holderKind === 'employee' ? request.body.holderId : null,
-          guestId: request.body.holderKind === 'guest' ? request.body.holderId : null,
+          employeeId: request.body.employeeId,
         },
         include: VEHICLE_INCLUDE,
       });
@@ -179,17 +164,6 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
         if (plateNorm.length < 2) throw unprocessable('Enter a valid number plate.');
         if (becomesActive) await plateConflict(plateNorm, current.id);
       }
-      if (request.body.active === false) {
-        const activeSession = await prisma.parkingSession.findFirst({
-          where: { vehicleId: current.id, endedAt: null },
-        });
-        if (activeSession) {
-          throw conflict(
-            'VEHICLE_PARKED',
-            `${current.plate} is still parked. Release the bay before deactivating the vehicle.`,
-          );
-        }
-      }
 
       const vehicle = await prisma.vehicle.update({
         where: { id: current.id },
@@ -217,5 +191,4 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
       return serializeVehicle(vehicle);
     },
   );
-
 }

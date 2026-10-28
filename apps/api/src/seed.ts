@@ -23,61 +23,22 @@ const EMPLOYEES = [
   ['ALCHE015', 'Thierry', 'Labonne', 'Facilities', 'Groundskeeper', 'contractor'],
 ] as const;
 
-const GUESTS = [
-  ['Élodie Tran', 'Mauritius Telecom', '+230 5700 1001', 'ID-MU-1001'],
-  ['Priya Naidoo', 'Orange Business', '+230 5700 1002', 'ID-MU-1002'],
-  ['Samuel Wong', 'Campus Books Ltd', '+230 5700 1003', 'PASSPORT-SG-2003'],
-  ['Amina Diallo', 'African Leadership Network', '+230 5700 1004', 'PASSPORT-SN-2004'],
-  ['Lucas Martin', 'Sodexo', '+230 5700 1005', 'ID-FR-1005'],
-  ['Rita Chung', 'Chung & Associates', '+230 5700 1006', 'ID-MU-1006'],
-] as const;
-
 const VEHICLES: Array<{
   plate: string;
   make: string;
   model: string;
   colour: string;
-  kind: 'employee' | 'guest';
   index: number;
   vehicleType: 'car' | 'motorbike' | 'van' | 'other';
 }> = [
-  { plate: 'AB 1234', make: 'Toyota', model: 'Corolla', colour: 'White', kind: 'employee', index: 0, vehicleType: 'car' },
-  { plate: 'AB 5678', make: 'Nissan', model: 'Note', colour: 'Silver', kind: 'employee', index: 1, vehicleType: 'car' },
-  { plate: 'AB 9012', make: 'Hyundai', model: 'i10', colour: 'Blue', kind: 'employee', index: 2, vehicleType: 'car' },
-  { plate: 'CD 3456', make: 'Kia', model: 'Sportage', colour: 'Black', kind: 'employee', index: 3, vehicleType: 'car' },
-  { plate: 'CD 7890', make: 'Honda', model: 'Fit', colour: 'Red', kind: 'employee', index: 4, vehicleType: 'car' },
-  { plate: 'EF 1122', make: 'Yamaha', model: 'NMAX', colour: 'Grey', kind: 'employee', index: 5, vehicleType: 'motorbike' },
-  { plate: 'EF 3344', make: 'Suzuki', model: 'Swift', colour: 'White', kind: 'employee', index: 6, vehicleType: 'car' },
-  { plate: 'GH 5566', make: 'Mitsubishi', model: 'L200', colour: 'White', kind: 'employee', index: 7, vehicleType: 'van' },
-  { plate: 'GU 9080', make: 'Nissan', model: 'X-Trail', colour: 'Grey', kind: 'guest', index: 0, vehicleType: 'car' },
-  { plate: 'GU 9081', make: 'Toyota', model: 'Hiace', colour: 'White', kind: 'guest', index: 1, vehicleType: 'van' },
-  { plate: 'GU 9082', make: 'Peugeot', model: '208', colour: 'Blue', kind: 'guest', index: 2, vehicleType: 'car' },
-];
-
-const AREA_BAYS: Array<{
-  area: { code: string; name: string };
-  bays: Array<{ from: number; to: number; prefix: string; type: string }>;
-}> = [
-  {
-    area: { code: 'MAIN', name: 'Main Lot' },
-    bays: [
-      { from: 1, to: 12, prefix: 'A-', type: 'STAFF' },
-      { from: 13, to: 20, prefix: 'A-', type: 'GENERAL' },
-      { from: 21, to: 26, prefix: 'A-', type: 'GENERAL' },
-      { from: 27, to: 28, prefix: 'A-', type: 'ACCESSIBLE' },
-      { from: 29, to: 30, prefix: 'A-', type: 'MOTORBIKE' },
-    ],
-  },
-  {
-    area: { code: 'ADMIN', name: 'Admin Front' },
-    bays: [
-      { from: 1, to: 3, prefix: 'B-', type: 'GUEST' },
-      { from: 4, to: 6, prefix: 'B-', type: 'GENERAL' },
-      { from: 7, to: 7, prefix: 'B-', type: 'MOTORBIKE' },
-      { from: 8, to: 8, prefix: 'B-', type: 'ACCESSIBLE' },
-      { from: 9, to: 10, prefix: 'B-', type: 'STAFF' },
-    ],
-  },
+  { plate: 'AB 1234', make: 'Toyota', model: 'Corolla', colour: 'White', index: 0, vehicleType: 'car' },
+  { plate: 'AB 5678', make: 'Nissan', model: 'Note', colour: 'Silver', index: 1, vehicleType: 'car' },
+  { plate: 'AB 9012', make: 'Hyundai', model: 'i10', colour: 'Blue', index: 2, vehicleType: 'car' },
+  { plate: 'CD 3456', make: 'Kia', model: 'Sportage', colour: 'Black', index: 3, vehicleType: 'car' },
+  { plate: 'CD 7890', make: 'Honda', model: 'Fit', colour: 'Red', index: 4, vehicleType: 'car' },
+  { plate: 'EF 1122', make: 'Yamaha', model: 'NMAX', colour: 'Grey', index: 5, vehicleType: 'motorbike' },
+  { plate: 'EF 3344', make: 'Suzuki', model: 'Swift', colour: 'White', index: 6, vehicleType: 'car' },
+  { plate: 'GH 5566', make: 'Mitsubishi', model: 'L200', colour: 'White', index: 7, vehicleType: 'van' },
 ];
 
 const DEMO_ACCOUNTS = [
@@ -152,56 +113,9 @@ async function main(): Promise<void> {
     );
   }
 
-  const guests = [];
-  for (const [fullName, company, phone, idNumber] of GUESTS) {
-    const existing = await prisma.guest.findFirst({ where: { fullName, company } });
-    guests.push(
-      existing
-        ? await prisma.guest.update({
-            where: { id: existing.id },
-            data: { phone, idNumber, active: true },
-          })
-        : await prisma.guest.create({
-            data: {
-              fullName,
-              company,
-              phone,
-              idNumber,
-              email: `${fullName.toLowerCase().replace(/[^a-z]+/g, '.')}@example.mu`,
-              active: true,
-            },
-          }),
-    );
-  }
-
-  const areaIds = new Map<string, string>();
-  const bayIds = new Map<string, string>();
-  for (const group of AREA_BAYS) {
-    const area = await prisma.parkingArea.upsert({
-      where: { code: group.area.code },
-      update: { name: group.area.name, active: true },
-      create: { code: group.area.code, name: group.area.name, active: true },
-    });
-    areaIds.set(group.area.code, area.id);
-    for (const range of group.bays) {
-      for (let number = range.from; number <= range.to; number += 1) {
-        const code = `${range.prefix}${String(number).padStart(2, '0')}`;
-        const bay = await prisma.parkingBay.upsert({
-          where: { areaId_code: { areaId: area.id, code } },
-          update: { bayType: range.type, active: true },
-          create: { areaId: area.id, code, bayType: range.type, active: true },
-        });
-        bayIds.set(code, bay.id);
-      }
-    }
-  }
-
   const vehicles = [];
   for (const spec of VEHICLES) {
-    const holder =
-      spec.kind === 'employee'
-        ? { employeeId: employees[spec.index]!.id, guestId: null }
-        : { employeeId: null, guestId: guests[spec.index]!.id };
+    const holder = { employeeId: employees[spec.index]!.id };
     const plateNorm = spec.plate.toUpperCase().replace(/[\s-]/g, '');
     const existing = await prisma.vehicle.findFirst({ where: { plateNorm, active: true } });
     vehicles.push(
@@ -306,136 +220,6 @@ async function main(): Promise<void> {
     await prisma.event.createMany({ data: data.filter((event) => event.occurredAt <= now) });
   }
 
-  const seededVisits = await prisma.guestVisit.findFirst({
-    where: { note: { startsWith: 'seed-demo' } },
-  });
-  if (!seededVisits) {
-    const today = DateTime.now().setZone(APP_ZONE).startOf('day');
-    const specs: Array<{
-      guest: number;
-      host: number;
-      purpose: string;
-      from: DateTime;
-      to: DateTime;
-      status: 'EXPECTED' | 'ON_SITE' | 'DEPARTED';
-      checkedIn?: DateTime;
-      checkedOut?: DateTime;
-      vehicleId?: string;
-    }> = [
-      {
-        guest: 0,
-        host: 0,
-        purpose: 'Campus tour',
-        from: today.set({ hour: 10 }),
-        to: today.set({ hour: 12 }),
-        status: 'EXPECTED',
-      },
-      {
-        guest: 1,
-        host: 1,
-        purpose: 'Supplier meeting',
-        from: today.set({ hour: 9 }),
-        to: today.set({ hour: 12 }),
-        status: 'ON_SITE',
-        checkedIn: today.set({ hour: 9, minute: 10 }),
-        vehicleId: vehicles[11]!.id,
-      },
-      {
-        guest: 2,
-        host: 2,
-        purpose: 'Book delivery',
-        from: today.set({ hour: 7 }),
-        to: today.set({ hour: 8 }),
-        status: 'ON_SITE',
-        checkedIn: today.set({ hour: 7, minute: 15 }),
-      },
-      {
-        guest: 3,
-        host: 3,
-        purpose: 'Leadership workshop',
-        from: today.set({ hour: 8 }),
-        to: today.set({ hour: 11 }),
-        status: 'DEPARTED',
-        checkedIn: today.set({ hour: 8, minute: 5 }),
-        checkedOut: today.set({ hour: 11, minute: 20 }),
-      },
-      {
-        guest: 4,
-        host: 4,
-        purpose: 'Catering review',
-        from: today.minus({ days: 1 }).set({ hour: 14 }),
-        to: today.minus({ days: 1 }).set({ hour: 16 }),
-        status: 'DEPARTED',
-        checkedIn: today.minus({ days: 1 }).set({ hour: 14, minute: 5 }),
-        checkedOut: today.minus({ days: 1 }).set({ hour: 16, minute: 10 }),
-      },
-      {
-        guest: 5,
-        host: 5,
-        purpose: 'Legal consultation',
-        from: today.set({ hour: 15 }),
-        to: today.set({ hour: 16 }),
-        status: 'EXPECTED',
-      },
-    ];
-    for (let index = 0; index < specs.length; index += 1) {
-      const spec = specs[index]!;
-      await prisma.guestVisit.create({
-        data: {
-          guestId: guests[spec.guest]!.id,
-          hostEmployeeId: employees[spec.host]!.id,
-          vehicleId: spec.vehicleId ?? null,
-          purpose: spec.purpose,
-          expectedFrom: spec.from.toUTC().toJSDate(),
-          expectedTo: spec.to.toUTC().toJSDate(),
-          badgeNo: `V-${String(index + 1).padStart(3, '0')}`,
-          status: spec.status,
-          checkedInAt: spec.checkedIn?.toUTC().toJSDate() ?? null,
-          checkedInBy: spec.checkedIn ? admin.id : null,
-          checkedOutAt: spec.checkedOut?.toUTC().toJSDate() ?? null,
-          checkedOutBy: spec.checkedOut ? admin.id : null,
-          note: `seed-demo:visit:${index}`,
-        },
-      });
-    }
-  }
-
-  const seededSessions = await prisma.parkingSession.count({
-    where: { note: 'seed-demo:session' },
-  });
-  if (seededSessions === 0) {
-    const allocations: Array<[string, string, 'employee' | 'guest', number]> = [
-      ['A-01', 'AB 1234', 'employee', 0],
-      ['A-02', 'AB 5678', 'employee', 1],
-      ['A-03', 'AB 9012', 'employee', 2],
-      ['A-04', 'CD 3456', 'employee', 3],
-      ['A-05', 'CD 7890', 'employee', 4],
-      ['A-06', 'EF 1122', 'employee', 5],
-      ['B-01', 'GU 9080', 'guest', 8],
-      ['B-02', 'GU 9081', 'guest', 9],
-      ['B-03', 'GU 9082', 'guest', 10],
-    ];
-    for (const [code, plate, category, vehicleIndex] of allocations) {
-      const vehicle = vehicles[vehicleIndex]!;
-      const holderName =
-        category === 'employee'
-          ? `${employees[vehicleIndex]!.firstName} ${employees[vehicleIndex]!.lastName}`
-          : guests[vehicleIndex - 8]!.fullName;
-      await prisma.parkingSession.create({
-        data: {
-          bayId: bayIds.get(code)!,
-          vehicleId: vehicle.id,
-          plateSnapshot: plate,
-          holderNameSnapshot: holderName,
-          holderCategory: category,
-          startedAt: DateTime.now().setZone(APP_ZONE).minus({ hours: 2 }).toUTC().toJSDate(),
-          allocatedBy: admin.id,
-          note: 'seed-demo:session',
-        },
-      });
-    }
-  }
-
   const seededTickets = await prisma.ticket.count({
     where: { reason: { startsWith: 'seed-demo:' } },
   });
@@ -490,9 +274,7 @@ async function main(): Promise<void> {
     entityId: null,
     after: {
       employees: employees.length,
-      guests: guests.length,
       vehicles: vehicles.length,
-      bays: bayIds.size,
       demoAccountsCreated: printedAccounts.map((account) => account.username),
     },
     reason: 'Idempotent demonstration seed',
@@ -500,10 +282,7 @@ async function main(): Promise<void> {
 
   console.log('Demo data ready.');
   console.log(`  Employees: ${employees.length}`);
-  console.log(`  Guests: ${guests.length}`);
   console.log(`  Vehicles: ${vehicles.length}`);
-  console.log(`  Bays: ${bayIds.size}`);
-  console.log(`  Active parking sessions: 9`);
   if (printedAccounts.length > 0) {
     console.log('\nOne-time demo account passwords (shown once):');
     for (const account of printedAccounts) {

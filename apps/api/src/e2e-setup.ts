@@ -38,32 +38,6 @@ async function ensureUser(username: string, displayName: string, role: 'SECURITY
   return created.id;
 }
 
-async function endActiveSessionForVehicle(vehicleId: string, userId: string) {
-  await prisma.parkingSession.updateMany({
-    where: { vehicleId, endedAt: null },
-    data: {
-      endedAt: new Date(),
-      endedBy: userId,
-      endReason: 'hr',
-      note: 'E2E reset',
-    },
-  });
-}
-
-async function endActiveSessionsForBay(code: string, userId: string) {
-  const bay = await prisma.parkingBay.findFirst({ where: { code } });
-  if (!bay) return;
-  await prisma.parkingSession.updateMany({
-    where: { bayId: bay.id, endedAt: null },
-    data: {
-      endedAt: new Date(),
-      endedBy: userId,
-      endReason: 'hr',
-      note: 'E2E reset',
-    },
-  });
-}
-
 async function ensureVisualEmployee(
   code: string,
   first: string,
@@ -114,13 +88,6 @@ async function main(): Promise<void> {
 
   const mohammad = await prisma.employee.findUnique({ where: { code: 'ALCHE007' } });
   if (!mohammad) throw new Error('Seed the demo data before running E2E setup.');
-  const vehicle = await prisma.vehicle.findFirst({
-    where: { employee: { code: 'ALCHE007' }, active: true },
-  });
-  if (vehicle) await endActiveSessionForVehicle(vehicle.id, securityId);
-  await endActiveSessionsForBay('B-03', securityId);
-  await endActiveSessionsForBay('A-07', securityId);
-
   await prisma.event.updateMany({
     where: {
       employeeId: mohammad.id,
@@ -145,64 +112,20 @@ async function main(): Promise<void> {
     },
   });
 
-  const visualArea = await prisma.parkingArea.upsert({
-    where: { code: 'VISUAL' },
-    update: { name: 'Visual Lot', active: true },
-    create: { code: 'VISUAL', name: 'Visual Lot', active: true },
-  });
-  const baySpecs: Array<[string, string]> = [
-    ['Z-01', 'STAFF'],
-    ['Z-02', 'STAFF'],
-    ['Z-03', 'GENERAL'],
-    ['Z-04', 'GENERAL'],
-    ['Z-05', 'GUEST'],
-    ['Z-06', 'ACCESSIBLE'],
-  ];
-  const visualBays = new Map<string, string>();
-  for (const [index, [code, bayType]] of baySpecs.entries()) {
-    const oldCode = `V-${String(index + 1).padStart(2, '0')}`;
-    const oldBay = await prisma.parkingBay.findFirst({
-      where: { areaId: visualArea.id, code: oldCode },
-    });
-    if (oldBay) {
-      await prisma.parkingBay.update({ where: { id: oldBay.id }, data: { code } });
-    }
-    const bay = await prisma.parkingBay.upsert({
-      where: { areaId_code: { areaId: visualArea.id, code } },
-      update: { bayType, active: true },
-      create: { areaId: visualArea.id, code, bayType, active: true },
-    });
-    visualBays.set(code, bay.id);
-  }
-
   const visualOne = await ensureVisualEmployee(
     'VISUAL001',
     'Vera',
     'Visual',
     'Visual Department',
   );
-  const visualTwo = await ensureVisualEmployee(
-    'VISUAL002',
-    'Victor',
-    'Visual',
-    'Visual Pool',
-  );
-  const visualThree = await ensureVisualEmployee(
-    'VISUAL003',
-    'Valerie',
-    'Visual',
-    'Visual Pool',
-  );
-  const one = await ensureVisualVehicle('VIS 001', visualOne.id);
-  const two = await ensureVisualVehicle('VIS 002', visualTwo.id);
-  const three = await ensureVisualVehicle('VIS 003', visualThree.id);
+  await ensureVisualVehicle('VIS 001', visualOne.id);
+  await prisma.vehicle.deleteMany({
+    where: { employeeId: visualOne.id, plate: { startsWith: 'E2E ' } },
+  });
 
-  await endActiveSessionForVehicle(one.id, hrId);
-  await endActiveSessionForVehicle(two.id, hrId);
-  await endActiveSessionForVehicle(three.id, hrId);
   await prisma.event.updateMany({
     where: {
-      employeeId: { in: [visualOne.id, visualTwo.id, visualThree.id] },
+      employeeId: visualOne.id,
       voidedAt: null,
     },
     data: {
@@ -211,40 +134,6 @@ async function main(): Promise<void> {
       voidReason: 'Visual fixture reset',
     },
   });
-
-  await prisma.parkingSession.updateMany({
-    where: {
-      endedAt: null,
-      bay: { areaId: visualArea.id },
-    },
-    data: {
-      endedAt: new Date(),
-      endedBy: hrId,
-      endReason: 'hr',
-      note: 'visual fixture reset',
-    },
-  });
-  const visualAssignments: Array<[string, string, string, string]> = [
-    ['Z-01', two.id, 'Victor Visual', 'VIS 002'],
-    ['Z-03', three.id, 'Valerie Visual', 'VIS 003'],
-  ];
-  for (const [code, vehicleId, holder, plate] of visualAssignments) {
-    const bayId = visualBays.get(code)!;
-    await prisma.parkingSession.create({
-      data: {
-        bayId,
-        vehicleId,
-        plateSnapshot: plate,
-        holderNameSnapshot: holder,
-        holderCategory: 'employee',
-        startedAt: DateTime.fromISO('2026-09-10T08:00:00', { zone: APP_ZONE })
-          .toUTC()
-          .toJSDate(),
-        allocatedBy: hrId,
-        note: 'visual-fixture',
-      },
-    });
-  }
 
   const day = DateTime.fromISO('2026-09-10', { zone: APP_ZONE });
   await prisma.event.createMany({
