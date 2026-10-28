@@ -295,20 +295,6 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       const onSiteEmployees = employees.filter(
         (employee) => employee.events[0]?.direction === 'IN',
       );
-      const guestVisits = await prisma.guestVisit.findMany({
-        where: { status: 'ON_SITE' },
-        include: {
-          guest: { select: { fullName: true, company: true } },
-          hostEmployee: { select: { firstName: true, lastName: true, department: true } },
-        },
-        orderBy: { checkedInAt: 'asc' },
-      });
-      const [totalBays, occupied] = await Promise.all([
-        prisma.parkingBay.count({ where: { active: true, area: { active: true } } }),
-        prisma.parkingSession.count({
-          where: { endedAt: null, bay: { active: true, area: { active: true } } },
-        }),
-      ]);
       const now = nowUtc();
       return {
         employees: onSiteEmployees.map((employee) => {
@@ -323,18 +309,6 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
             vehicles: employee.vehicles.map((vehicle) => vehicle.plate),
           };
         }),
-        guests: guestVisits.map((visit) => ({
-          visitId: visit.id,
-          guestName: visit.guest.fullName,
-          company: visit.guest.company,
-          hostName: `${visit.hostEmployee.firstName} ${visit.hostEmployee.lastName}`,
-          hostDepartment: visit.hostEmployee.department,
-          since: isoRequired(visit.checkedInAt!),
-          expectedTo: isoRequired(visit.expectedTo),
-          badgeNo: visit.badgeNo,
-          overdue: visit.expectedTo < now.toJSDate(),
-        })),
-        parking: { total: totalBays, occupied, free: totalBays - occupied },
         generatedAt: now.toISO() ?? '',
       };
     },
@@ -404,39 +378,6 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         if (event.direction === 'IN') onCampusNow += 1;
       }
 
-      const [guestExpected, guestOnSite, guestOverdue, guestDeparted, totalBays, occupied, activeBays] =
-        await Promise.all([
-          prisma.guestVisit.count({
-            where: {
-              status: 'EXPECTED',
-              expectedFrom: { gte: rangeStartUtc(today), lt: rangeEndUtc(today) },
-            },
-          }),
-          prisma.guestVisit.count({ where: { status: 'ON_SITE' } }),
-          prisma.guestVisit.count({ where: { status: 'ON_SITE', expectedTo: { lt: now.toJSDate() } } }),
-          prisma.guestVisit.count({
-            where: {
-              status: 'DEPARTED',
-              checkedOutAt: { gte: rangeStartUtc(today), lt: rangeEndUtc(today) },
-            },
-          }),
-          prisma.parkingBay.count({ where: { active: true, area: { active: true } } }),
-          prisma.parkingSession.count({
-            where: { endedAt: null, bay: { active: true, area: { active: true } } },
-          }),
-          prisma.parkingBay.findMany({
-            where: { active: true, area: { active: true } },
-            include: { sessions: { where: { endedAt: null }, select: { id: true } } },
-          }),
-        ]);
-      const byType: Record<string, { total: number; occupied: number; free: number }> = {};
-      for (const bay of activeBays) {
-        const group = (byType[bay.bayType] ??= { total: 0, occupied: 0, free: 0 });
-        group.total += 1;
-        if (bay.sessions.length > 0) group.occupied += 1;
-      }
-      for (const group of Object.values(byType)) group.free = group.total - group.occupied;
-
       return {
         generatedAt: now.toISO() ?? '',
         today,
@@ -445,18 +386,6 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           onCampusNow,
         },
         month: monthTotals,
-        guests: {
-          expectedToday: guestExpected,
-          onSiteNow: guestOnSite,
-          overdueNow: guestOverdue,
-          departedToday: guestDeparted,
-        },
-        parking: {
-          total: totalBays,
-          occupied,
-          free: totalBays - occupied,
-          byType,
-        },
         trend: [...trend.values()].sort((a, b) => a.date.localeCompare(b.date)),
         range: { from, to },
       };

@@ -82,22 +82,6 @@ export const DashboardStatsSchema = z.object({
     absent: z.number().int(),
     averageSpanHours: z.number().nullable(),
   }),
-  guests: z.object({
-    expectedToday: z.number().int(),
-    onSiteNow: z.number().int(),
-    overdueNow: z.number().int(),
-    departedToday: z.number().int(),
-  }),
-  parking: z.object({
-    total: z.number().int(),
-    occupied: z.number().int(),
-    free: z.number().int(),
-    byType: z.record(z.string(), z.object({
-      total: z.number().int(),
-      occupied: z.number().int(),
-      free: z.number().int(),
-    })),
-  }),
   trend: z.array(
     z.object({
       date: z.string(),
@@ -123,23 +107,5 @@ export const OnCampusResponseSchema = z.object({
       vehicles: z.array(z.string()),
     }),
   ),
-  guests: z.array(
-    z.object({
-      visitId: UuidSchema,
-      guestName: z.string(),
-      company: z.string().nullable(),
-      hostName: z.string(),
-      hostDepartment: z.string(),
-      since: z.string(),
-      expectedTo: z.string(),
-      badgeNo: z.string().nullable(),
-      overdue: z.boolean(),
-    }),
-  ),
-  parking: z.object({
-    total: z.number().int(),
-    occupied: z.number().int(),
-    free: z.number().int(),
-  }),
   generatedAt: z.string(),
 });

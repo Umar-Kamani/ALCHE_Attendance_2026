@@ -44,20 +44,10 @@ export const CreateEventBodySchema = z.object({
   reason: z.string().trim().max(1000).optional().nullable(),
 });
 
-export const ReleasedParkingSessionSchema = z.object({
-  sessionId: UuidSchema,
-  bayId: UuidSchema,
-  bayCode: z.string(),
-  areaName: z.string(),
-  plate: z.string(),
-  endedAt: IsoDateTimeSchema,
-});
-
 export const CreateEventResponseSchema = z.object({
   event: AttendanceEventSchema,
   inferredDirection: DirectionSchema,
   undoUntil: z.string().nullable(),
-  releasedSessions: z.array(ReleasedParkingSessionSchema),
   employeeState: z.object({
     onCampus: z.boolean(),
     since: z.string().nullable(),
@@ -157,15 +147,6 @@ export const KioskVehicleSchema = z.object({
   model: z.string().nullable(),
   colour: z.string().nullable(),
   vehicleType: z.string(),
-  activeParking: z
-    .object({
-      sessionId: UuidSchema,
-      bayId: UuidSchema,
-      bayCode: z.string(),
-      areaName: z.string(),
-      startedAt: z.string(),
-    })
-    .nullable(),
 });
 
 export const KioskEmployeeResultSchema = z.object({
@@ -185,22 +166,17 @@ export const KioskEmployeeResultSchema = z.object({
   vehicles: z.array(KioskVehicleSchema),
 });
 
-export const KioskGuestResultSchema = z.object({
-  kind: z.literal('guest'),
-  id: UuidSchema,
-  fullName: z.string(),
-  company: z.string().nullable(),
-  active: z.boolean(),
-  vehicles: z.array(KioskVehicleSchema),
-});
-
 export const KioskSearchResponseSchema = z.object({
   employees: z.array(KioskEmployeeResultSchema),
-  guests: z.array(KioskGuestResultSchema),
 });
+
+export const KioskEmployeeOptionsResponseSchema = z.object({
+  employees: z.array(KioskEmployeeResultSchema),
+});
+
 export type KioskSearchResponse = z.infer<typeof KioskSearchResponseSchema>;
+export type KioskEmployeeOptionsResponse = z.infer<typeof KioskEmployeeOptionsResponseSchema>;
 export type KioskEmployeeResult = z.infer<typeof KioskEmployeeResultSchema>;
-export type KioskGuestResult = z.infer<typeof KioskGuestResultSchema>;
 export type KioskVehicle = z.infer<typeof KioskVehicleSchema>;
 export type KioskActivityItem = z.infer<typeof KioskActivityItemSchema>;
 export type KioskActivityResponse = z.infer<typeof KioskActivityResponseSchema>;
@@ -208,7 +184,6 @@ export type AttendanceResponse = z.infer<typeof AttendanceResponseSchema>;
 export type AttendanceTotals = z.infer<typeof AttendanceTotalsSchema>;
 export type MonthAttendanceResponse = z.infer<typeof MonthAttendanceResponseSchema>;
 export type CreateEventResponse = z.infer<typeof CreateEventResponseSchema>;
-export type ReleasedParkingSession = z.infer<typeof ReleasedParkingSessionSchema>;
 export type EmployeeRecentEventsResponse = z.infer<typeof EmployeeRecentEventsResponseSchema>;
 
 export const KioskActivityItemSchema = z.object({

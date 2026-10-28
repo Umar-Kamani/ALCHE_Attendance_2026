@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateEventResponse,
   KioskActivityResponse,
+  KioskEmployeeOptionsResponse,
   KioskEmployeeResult,
-  KioskGuestResult,
   KioskSearchResponse,
-  ParkingBoardResponse,
 } from '@alche/shared';
 import { ApiError, apiFetch } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
@@ -35,78 +33,27 @@ import {
   ArrowRightIcon,
   CarIcon,
   CheckIcon,
+  ChevronDownIcon,
   ClockIcon,
-  MapPinIcon,
   SearchIcon,
 } from '../components/icons';
 import { cn } from '../lib/cn';
 
-type SearchResult = KioskEmployeeResult | KioskGuestResult;
-
-interface SelectedParking {
-  sessionId: string;
-  bayId: string;
-  bayCode: string;
-  areaName: string;
-}
-
-function bayNumber(code: string): number {
-  const match = code.match(/(\d+)/);
-  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
-}
-
-interface ParkingOption {
-  id: string;
-  code: string;
-  bayType: string;
-  areaName: string;
-}
-
-function freeParkingBays(
-  board: ParkingBoardResponse | undefined,
-  vehicleType: string,
-): ParkingOption[] {
-  if (!board) return [];
-  const preferred = vehicleType === 'motorbike' ? 'MOTORBIKE' : 'STAFF';
-  return board.areas
-    .flatMap((area) =>
-      area.bays
-        .filter(
-          (bay) =>
-            bay.active &&
-            !bay.session &&
-            (bay.bayType === preferred || bay.bayType === 'GENERAL'),
-        )
-        .map((bay) => ({
-          id: bay.id,
-          code: bay.code,
-          bayType: bay.bayType,
-          areaName: area.name,
-        })),
-    )
-    .sort((a, b) => {
-      if (a.bayType === preferred && b.bayType !== preferred) return -1;
-      if (b.bayType === preferred && a.bayType !== preferred) return 1;
-      return bayNumber(a.code) - bayNumber(b.code);
-    });
-}
-
-function resultLabel(result: SearchResult): string {
-  if (result.kind === 'employee') return result.code;
-  return result.company ?? 'Guest';
+function resultLabel(employee: KioskEmployeeResult): string {
+  return employee.code;
 }
 
 export function KioskPage() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 250);
-  const [selected, setSelected] = useState<SearchResult | null>(null);
+  const [selected, setSelected] = useState<KioskEmployeeResult | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [directionOverride, setDirectionOverride] = useState<'IN' | 'OUT' | null>(null);
-  const [vehicleId, setVehicleId] = useState<string | null>(null);
-  const [parkingChoice, setParkingChoice] = useState<string>('none');
   const [timeOverride, setTimeOverride] = useState(false);
   const [eventTime, setEventTime] = useState(() => toLocalInputValue());
   const [formError, setFormError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
   const [vehicleOpen, setVehicleOpen] = useState(false);
   const [vehicleForm, setVehicleForm] = useState({
     plate: '',
@@ -117,8 +64,9 @@ export function KioskPage() {
   });
   const [vehicleFieldErrors, setVehicleFieldErrors] = useState<Record<string, string[]>>({});
   const { user } = useAuth();
-  const canPark = user?.role === 'SECURITY';
+  const canEditEmployee = user?.role === 'SECURITY' || user?.role === 'HR';
   const searchRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -132,23 +80,31 @@ export function KioskPage() {
     staleTime: 5_000,
   });
 
+  const employeeOptions = useQuery({
+    queryKey: ['kiosk', 'employees'],
+    queryFn: () => apiFetch<KioskEmployeeOptionsResponse>('/kiosk/employees'),
+    staleTime: 30_000,
+  });
+
   const activity = useQuery({
     queryKey: ['kiosk', 'activity'],
     queryFn: () => apiFetch<KioskActivityResponse>('/kiosk/activity'),
     refetchInterval: 30_000,
   });
 
-  const board = useQuery({
-    queryKey: ['parking', 'board', 'kiosk'],
-    queryFn: () => apiFetch<ParkingBoardResponse>('/parking/board'),
-    enabled: selected?.kind === 'employee',
-    staleTime: 10_000,
-  });
-
-  const results = useMemo<SearchResult[]>(() => {
-    if (!search.data) return [];
-    return [...search.data.employees, ...search.data.guests];
-  }, [search.data]);
+  const results = useMemo(() => search.data?.employees ?? [], [search.data]);
+  const pickerResults = useMemo(() => {
+    const term = pickerQuery.trim().toLowerCase();
+    return (employeeOptions.data?.employees ?? [])
+      .filter((employee) =>
+        term
+          ? `${employee.fullName} ${employee.code} ${employee.department}`
+              .toLowerCase()
+              .includes(term)
+          : true,
+      )
+      .slice(0, 100);
+  }, [employeeOptions.data, pickerQuery]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -156,54 +112,29 @@ export function KioskPage() {
 
   useEffect(() => {
     if (!selected || !search.data) return;
-    const fresh = results.find((result) => result.kind === selected.kind && result.id === selected.id);
+    const fresh = results.find((result) => result.id === selected.id);
     if (fresh) setSelected(fresh);
-  }, [results, selected?.id, selected?.kind]);
+  }, [results, selected?.id]);
 
-  const employee = selected?.kind === 'employee' ? selected : null;
-  const inferredDirection: 'IN' | 'OUT' = employee?.currentState.onCampus ? 'OUT' : 'IN';
+  useEffect(() => {
+    if (!selected || !employeeOptions.data) return;
+    const fresh = employeeOptions.data.employees.find((employee) => employee.id === selected.id);
+    if (fresh) setSelected(fresh);
+  }, [employeeOptions.data, selected?.id]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [pickerOpen]);
+
+  const inferredDirection: 'IN' | 'OUT' = selected?.currentState.onCampus ? 'OUT' : 'IN';
   const direction = directionOverride ?? inferredDirection;
-  const vehicle =
-    employee?.vehicles.find((item) => item.id === vehicleId) ?? employee?.vehicles[0] ?? null;
-  const parkingOptions = useMemo(
-    () => freeParkingBays(board.data, vehicle?.vehicleType ?? 'car'),
-    [board.data, vehicle?.vehicleType],
-  );
-  const canOfferParking =
-    canPark && direction === 'IN' && Boolean(vehicle) && !vehicle?.activeParking;
-  const chosenBay =
-    canOfferParking && parkingChoice !== 'none'
-      ? parkingOptions.find((bay) => bay.id === parkingChoice) ?? null
-      : null;
-
-  useEffect(() => {
-    if (!employee) {
-      setVehicleId(null);
-      return;
-    }
-    setVehicleId((current) =>
-      employee.vehicles.some((item) => item.id === current)
-        ? current
-        : employee.vehicles[0]?.id ?? null,
-    );
-  }, [employee?.id, employee?.vehicles.map((item) => item.id).join('|')]);
-
-  useEffect(() => {
-    if (!canOfferParking || parkingOptions.length === 0) {
-      setParkingChoice('none');
-      return;
-    }
-    if (
-      parkingChoice !== 'none' &&
-      !parkingOptions.some((bay) => bay.id === parkingChoice)
-    ) {
-      setParkingChoice(parkingOptions[0]!.id);
-    }
-  }, [canOfferParking, parkingChoice, parkingOptions]);
-
-  useEffect(() => {
-    setParkingChoice('');
-  }, [direction, vehicle?.id]);
 
   useEffect(() => {
     setTimeOverride(false);
@@ -212,45 +143,24 @@ export function KioskPage() {
 
   const record = useMutation({
     mutationFn: async () => {
-      if (!employee) throw new Error('Choose a person first.');
+      if (!selected) throw new Error('Choose a person first.');
       setFormError(null);
       const occurredAt = timeOverride ? localInputToIso(eventTime) : undefined;
       if (timeOverride && !occurredAt) {
         throw new Error('Choose a valid event time.');
       }
-      const eventResult = await apiFetch<CreateEventResponse>('/events', {
+      return apiFetch<CreateEventResponse>('/events', {
         method: 'POST',
         body: {
-          employeeId: employee.id,
+          employeeId: selected.id,
           direction,
           ...(occurredAt ? { occurredAt } : {}),
         },
       });
-
-      let parkingError: string | null = null;
-      if (direction === 'IN' && chosenBay && vehicle) {
-        try {
-          await apiFetch('/parking/sessions', {
-            method: 'POST',
-            body: {
-              vehicleId: vehicle.id,
-              bayId: chosenBay.id,
-              startedAt: eventResult.event.occurredAt,
-            },
-          });
-        } catch (error) {
-          parkingError =
-            error instanceof ApiError
-              ? error.message
-              : 'Attendance was saved, but the parking bay could not be allocated.';
-        }
-      }
-      return { eventResult, parkingError };
     },
-    onSuccess: async ({ eventResult, parkingError }) => {
-      setFormError(parkingError);
+    onSuccess: async (eventResult) => {
       setSelected((current) => {
-        if (!current || current.kind !== 'employee') return current;
+        if (!current) return current;
         return {
           ...current,
           currentState: {
@@ -259,82 +169,35 @@ export function KioskPage() {
             lastDirection: direction,
             lastOccurredAt: eventResult.event.occurredAt,
           },
-          vehicles: current.vehicles.map((item) => {
-            if (direction === 'OUT') return { ...item, activeParking: null };
-            if (item.id !== vehicle?.id) return item;
-            return chosenBay
-              ? {
-                  ...item,
-                  activeParking: {
-                    sessionId: 'pending',
-                    bayId: chosenBay.id,
-                    bayCode: chosenBay.code,
-                    areaName: chosenBay.areaName,
-                    startedAt: eventResult.event.occurredAt,
-                  },
-                }
-              : item;
-          }),
         };
       });
 
-      const released = eventResult.releasedSessions;
-      if (parkingError) {
-        toast.push({
-          title: `${employee!.fullName} marked ${direction}`,
-          message: parkingError,
-          tone: 'error',
-          duration: 8_000,
-        });
-      } else if (direction === 'OUT' && released.length > 0) {
-        toast.push({
-          title: `${employee!.fullName} marked OUT`,
-          message: `Released ${released.map((item) => item.bayCode).join(', ')}.`,
-          tone: 'success',
-        });
-      } else if (direction === 'IN' && chosenBay) {
-        toast.push({
-          title: `${employee!.fullName} is on campus`,
-          message: `Parked in ${chosenBay.code}, ${chosenBay.areaName}.`,
-          tone: 'success',
-          action:
-            eventResult.undoUntil && eventResult.event.id
-              ? {
-                  label: 'Undo this entry',
-                  onClick: () => undo.mutate(eventResult.event.id),
-                }
-              : undefined,
-        });
-      } else {
-        toast.push({
-          title: `${employee!.fullName} marked ${direction}`,
-          message:
-            direction === 'OUT' ? 'No active parking session to release.' : 'Attendance recorded.',
-          tone: 'success',
-          action: eventResult.undoUntil
-            ? {
-                label: 'Undo this entry',
-                onClick: () => undo.mutate(eventResult.event.id),
-              }
-            : undefined,
-        });
-      }
+      toast.push({
+        title: `${selected!.fullName} marked ${direction}`,
+        message:
+          direction === 'IN'
+            ? 'On campus.'
+            : 'Off campus and attendance recorded.',
+        tone: 'success',
+        action: eventResult.undoUntil
+          ? {
+              label: 'Undo this entry',
+              onClick: () => undo.mutate(eventResult.event.id),
+            }
+          : undefined,
+      });
 
       setDirectionOverride(null);
-      setParkingChoice('');
       setTimeOverride(false);
       setEventTime(toLocalInputValue());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['kiosk'] }),
-        queryClient.invalidateQueries({ queryKey: ['parking'] }),
         queryClient.invalidateQueries({ queryKey: ['on-campus'] }),
       ]);
       const refreshed = await search.refetch();
-      const next = refreshed.data
-        ? [...refreshed.data.employees, ...refreshed.data.guests].find(
-            (item) => item.kind === employee!.kind && item.id === employee!.id,
-          )
-        : null;
+      const next = refreshed.data?.employees.find(
+        (item) => item.id === selected!.id,
+      );
       if (next) setSelected(next);
       searchRef.current?.focus();
     },
@@ -355,9 +218,9 @@ export function KioskPage() {
       toast.push({ title: 'Entry undone', message: data.message, tone: 'success' });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['kiosk'] }),
-        queryClient.invalidateQueries({ queryKey: ['parking'] }),
+        queryClient.invalidateQueries({ queryKey: ['on-campus'] }),
       ]);
-      await search.refetch();
+      await Promise.all([search.refetch(), employeeOptions.refetch()]);
     },
     onError: (error) => {
       toast.push({
@@ -378,8 +241,7 @@ export function KioskPage() {
           model: vehicleForm.model || null,
           colour: vehicleForm.colour || null,
           vehicleType: vehicleForm.vehicleType,
-          holderKind: 'employee',
-          holderId: employee!.id,
+          employeeId: selected!.id,
         },
       }),
     onSuccess: async () => {
@@ -387,10 +249,9 @@ export function KioskPage() {
       setVehicleOpen(false);
       setVehicleForm({ plate: '', make: '', model: '', colour: '', vehicleType: 'car' });
       setVehicleFieldErrors({});
-      const refreshed = await search.refetch();
-      const next = refreshed.data?.employees.find((item) => item.id === employee!.id);
+      const refreshed = await Promise.all([search.refetch(), employeeOptions.refetch()]);
+      const next = refreshed[0].data?.employees.find((item) => item.id === selected!.id);
       if (next) setSelected(next);
-      await queryClient.invalidateQueries({ queryKey: ['parking'] });
     },
     onError: (error) => {
       if (error instanceof ApiError) setVehicleFieldErrors(error.fieldErrors());
@@ -402,14 +263,14 @@ export function KioskPage() {
     },
   });
 
-  const choose = (result: SearchResult) => {
-    setSelected(result);
+  const choose = (employee: KioskEmployeeResult) => {
+    setSelected(employee);
     setDirectionOverride(null);
-    setVehicleId(result.kind === 'employee' ? (result.vehicles[0]?.id ?? null) : null);
-    setParkingChoice('');
     setTimeOverride(false);
     setEventTime(toLocalInputValue());
     setFormError(null);
+    setPickerOpen(false);
+    setPickerQuery('');
   };
 
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -434,7 +295,7 @@ export function KioskPage() {
         <div>
           <h1 className="text-heading-sm font-medium tracking-heading-sm text-ink">Gate kiosk</h1>
           <p className="mt-1 text-body-sm text-slate">
-            Search a name, staff number or number plate. One action follows.
+            Select an employee or search by name, staff number or number plate.
           </p>
         </div>
         <div
@@ -446,101 +307,136 @@ export function KioskPage() {
         </div>
       </div>
 
-      <div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="relative" ref={pickerRef}>
+          <Input
+            label="Select employee"
+            value={pickerQuery}
+            onFocus={() => setPickerOpen(true)}
+            onChange={(event) => {
+              setPickerQuery(event.target.value);
+              setPickerOpen(true);
+            }}
+            placeholder="Choose an employee…"
+            role="combobox"
+            aria-expanded={pickerOpen}
+            aria-controls="employee-picker-results"
+            suffix={<ChevronDownIcon size={19} />}
+          />
+          {pickerOpen ? (
+            <div
+              id="employee-picker-results"
+              role="listbox"
+              className="absolute inset-x-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-3xl border border-mist bg-snow p-2 shadow-xl"
+            >
+              {employeeOptions.isLoading ? (
+                <div className="space-y-2 p-2">
+                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-11 w-full" />
+                </div>
+              ) : employeeOptions.isError ? (
+                <p className="p-3 text-body-sm text-error-ink">
+                  Employees could not load. Use search instead.
+                </p>
+              ) : pickerResults.length === 0 ? (
+                <p className="p-3 text-body-sm text-slate">No matching employee.</p>
+              ) : (
+                pickerResults.map((employee) => (
+                  <button
+                    key={employee.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected?.id === employee.id}
+                    onClick={() => choose(employee)}
+                    className={cn(
+                      'flex min-h-12 w-full items-center gap-3 rounded-md px-3 text-left transition-colors',
+                      selected?.id === employee.id ? 'bg-periwinkle' : 'hover:bg-cloud',
+                    )}
+                  >
+                    <Avatar name={employee.fullName} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-body-sm font-medium text-ink">
+                        {employee.fullName}
+                      </span>
+                      <span className="block truncate text-caption text-slate">
+                        {employee.code} · {employee.department}
+                      </span>
+                    </span>
+                    <StatusPill tone={employee.currentState.onCampus ? 'ON_SITE' : 'INACTIVE'}>
+                      {employee.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
+                    </StatusPill>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+
         <div className="relative">
           <Input
             ref={searchRef}
-            autoFocus
+            label="Search name or plate"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder="Start typing a name, code or plate…"
-            aria-label="Search people and vehicles"
+            placeholder="Type a name, code or number plate…"
+            aria-label="Search employees and vehicles"
             role="combobox"
             aria-expanded={Boolean(query && results.length > 0)}
             aria-controls="kiosk-results"
             aria-activedescendant={
-              results[activeIndex] ? `kiosk-result-${results[activeIndex]!.kind}-${results[activeIndex]!.id}` : undefined
+              results[activeIndex] ? `kiosk-result-employee-${results[activeIndex]!.id}` : undefined
             }
-            className="h-16 border-mist bg-snow pl-4 pr-14 text-[20px]"
-            suffix={<SearchIcon size={24} />}
+            suffix={<SearchIcon size={20} />}
           />
+          {debouncedQuery.trim() ? (
+            <div
+              id="kiosk-results"
+              role="listbox"
+              className="absolute inset-x-0 top-full z-20 mt-2 max-h-80 overflow-y-auto rounded-3xl border border-mist bg-snow p-2 shadow-xl"
+            >
+              {search.isLoading ? (
+                <div className="space-y-2 p-2">
+                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-11 w-full" />
+                </div>
+              ) : search.isError ? (
+                <p className="p-3 text-body-sm text-error-ink">Search is unavailable. Try again.</p>
+              ) : results.length === 0 ? (
+                <p className="p-3 text-body-sm text-slate">No matching employee or vehicle.</p>
+              ) : (
+                results.map((employee, index) => (
+                  <button
+                    key={employee.id}
+                    id={`kiosk-result-employee-${employee.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(employee)}
+                    className={cn(
+                      'flex min-h-12 w-full items-center gap-3 rounded-md px-3 text-left transition-colors',
+                      index === activeIndex ? 'bg-periwinkle' : 'hover:bg-cloud',
+                    )}
+                  >
+                    <Avatar name={employee.fullName} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-body-sm font-medium text-ink">
+                        {employee.fullName}
+                      </span>
+                      <span className="block truncate text-caption text-slate">
+                        {resultLabel(employee)} · {employee.department}
+                      </span>
+                    </span>
+                    <StatusPill tone={employee.currentState.onCampus ? 'ON_SITE' : 'INACTIVE'}>
+                      {employee.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
+                    </StatusPill>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
         </div>
-
-        {debouncedQuery.trim() ? (
-          <div
-            id="kiosk-results"
-            role="listbox"
-            className="mt-2 overflow-hidden rounded-3xl border border-mist bg-snow shadow-xl"
-          >
-            {search.isLoading ? (
-              <div className="space-y-3 p-4">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-2/3" />
-              </div>
-            ) : search.isError ? (
-              <div className="p-4">
-                <p className="text-body-sm text-error-ink">Search is unavailable. Try again.</p>
-              </div>
-            ) : results.length === 0 ? (
-              <p className="p-4 text-body-sm text-slate">No matching person or vehicle.</p>
-            ) : (
-              <div className="divide-y divide-mist">
-                {(['employee', 'guest'] as const).map((kind) => {
-                  const group = results.filter((result) => result.kind === kind);
-                  if (group.length === 0) return null;
-                  return (
-                    <div key={kind} className="p-2">
-                      <p className="px-3 pb-1 pt-2 text-caption font-medium uppercase tracking-caption text-slate">
-                        {kind === 'employee' ? 'Staff' : 'Guests'}
-                      </p>
-                      {group.map((result) => {
-                        const globalIndex = results.indexOf(result);
-                        const isActive = globalIndex === activeIndex;
-                        return (
-                          <button
-                            key={`${result.kind}-${result.id}`}
-                            id={`kiosk-result-${result.kind}-${result.id}`}
-                            type="button"
-                            role="option"
-                            aria-selected={isActive}
-                            onMouseEnter={() => setActiveIndex(globalIndex)}
-                            onClick={() => choose(result)}
-                            className={cn(
-                              'flex min-h-[60px] w-full items-center gap-3 rounded-md px-3 text-left transition-colors',
-                              isActive ? 'bg-periwinkle' : 'hover:bg-cloud',
-                            )}
-                          >
-                            <Avatar name={result.fullName} />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-body-sm font-medium text-ink">
-                                {result.fullName}
-                              </span>
-                              <span className="block truncate text-caption text-slate">
-                                {resultLabel(result)}
-                                {result.kind === 'employee' ? ` · ${result.department}` : ''}
-                              </span>
-                            </span>
-                            {result.kind === 'employee' ? (
-                              <StatusPill
-                                tone={result.currentState.onCampus ? 'ON_SITE' : 'INACTIVE'}
-                              >
-                                {result.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
-                              </StatusPill>
-                            ) : (
-                              <StatusPill tone="NEUTRAL">{result.kind.toUpperCase()}</StatusPill>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : null}
       </div>
 
       {selected ? (
@@ -552,194 +448,120 @@ export function KioskPage() {
                 <h2 className="text-subheading font-medium tracking-subheading text-ink">
                   {selected.fullName}
                 </h2>
-                {selected.kind === 'employee' ? (
-                  <StatusPill tone={selected.currentState.onCampus ? 'ON_SITE' : 'INACTIVE'}>
-                    {selected.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
-                  </StatusPill>
-                ) : (
-                  <StatusPill tone="NEUTRAL">GUEST</StatusPill>
-                )}
+                <StatusPill tone={selected.currentState.onCampus ? 'ON_SITE' : 'INACTIVE'}>
+                  {selected.currentState.onCampus ? 'ON CAMPUS' : 'OFF CAMPUS'}
+                </StatusPill>
               </div>
               <p className="mt-1 text-body-sm text-slate">
-                {selected.kind === 'employee'
-                  ? `${selected.code} · ${selected.department}`
-                  : (selected.company ?? 'Guest visit')}
+                {selected.code} · {selected.department}
               </p>
-
-              {selected.kind === 'employee' ? (
-                <p className="mt-3 text-body text-ink">
-                  {selected.currentState.onCampus && selected.currentState.since
-                    ? `On campus since ${formatTime(selected.currentState.since)}`
-                    : selected.currentState.lastOccurredAt
-                      ? `Off campus, last left ${formatTime(selected.currentState.lastOccurredAt)}`
-                      : 'No attendance recorded yet.'}
-                </p>
-              ) : (
-                <p className="mt-3 text-body-sm text-slate">
-                  Guests are checked in from the Guest register so the host and visit are recorded.
-                </p>
-              )}
+              <p className="mt-3 text-body text-ink">
+                {selected.currentState.onCampus && selected.currentState.since
+                  ? `On campus since ${formatTime(selected.currentState.since)}`
+                  : selected.currentState.lastOccurredAt
+                    ? `Off campus, last left ${formatTime(selected.currentState.lastOccurredAt)}`
+                    : 'No attendance recorded yet.'}
+              </p>
             </div>
           </div>
 
-          {selected.kind === 'employee' ? (
-            <>
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                {selected.vehicles.map((item) => (
-                  <span
-                    key={item.id}
-                    className="inline-flex items-center gap-2 rounded-md bg-cloud px-3 py-2 text-body-sm text-ink"
-                  >
-                    <CarIcon size={17} />
-                    <span className="font-medium">{item.plate}</span>
-                    <span className="text-slate">
-                      {[item.make, item.model, item.colour].filter(Boolean).join(' · ') || 'Vehicle'}
-                    </span>
-                    {item.activeParking ? (
-                      <StatusPill tone="ON_SITE">PARKED {item.activeParking.bayCode}</StatusPill>
-                    ) : null}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {selected.vehicles.length === 0 ? (
+              <p className="text-body-sm text-slate">No vehicles registered.</p>
+            ) : (
+              selected.vehicles.map((item) => (
+                <span
+                  key={item.id}
+                  className="inline-flex items-center gap-2 rounded-md bg-cloud px-3 py-2 text-body-sm text-ink"
+                >
+                  <CarIcon size={17} />
+                  <span className="font-medium">{item.plate}</span>
+                  <span className="text-slate">
+                    {[item.make, item.model, item.colour].filter(Boolean).join(' · ') || 'Vehicle'}
                   </span>
-                ))}
-                <Button variant="text" size="sm" onClick={() => setVehicleOpen(true)}>
-                  Add vehicle
-                </Button>
-              </div>
+                </span>
+              ))
+            )}
+            {canEditEmployee ? (
+              <Button variant="text" size="sm" onClick={() => setVehicleOpen(true)}>
+                Add vehicle
+              </Button>
+            ) : null}
+          </div>
 
-              {selected.vehicles.length > 1 ? (
-                <div className="mt-4 max-w-sm">
-                  <Select
-                    label="Vehicle for this action"
-                    value={vehicle?.id ?? ''}
-                    onChange={(event) => setVehicleId(event.target.value || null)}
-                    options={selected.vehicles.map((item) => ({
-                      value: item.id,
-                      label: `${item.plate}${item.make ? ` · ${item.make}` : ''}`,
-                    }))}
-                  />
-                </div>
-              ) : null}
-
-              <fieldset className="mt-5 rounded-3xl bg-cloud p-4">
-                <legend className="px-1 text-body-sm font-medium text-ink">Event time</legend>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-body-sm text-slate">
-                    {timeOverride
-                      ? 'Custom time will be used for attendance and parking.'
-                      : 'The current time will be recorded.'}
-                  </p>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center rounded-md px-2 text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
-                    onClick={() => {
-                      if (!timeOverride) setEventTime(toLocalInputValue());
-                      setTimeOverride((current) => !current);
-                    }}
-                  >
-                    {timeOverride ? 'Use current time' : 'Change time'}
-                  </button>
-                </div>
-                {timeOverride ? (
-                  <div className="mt-3 max-w-xs">
-                    <Input
-                      label="Time (Mauritius)"
-                      type="datetime-local"
-                      value={eventTime}
-                      max={toLocalInputValue()}
-                      onChange={(event) => setEventTime(event.target.value)}
-                    />
-                  </div>
-                ) : null}
-              </fieldset>
-
-              {canPark && direction === 'IN' && vehicle && !vehicle.activeParking ? (
-                <fieldset className="mt-5 rounded-3xl bg-cloud p-4">
-                  <legend className="px-1 text-body-sm font-medium text-ink">
-                    Parking for {vehicle.plate}
-                  </legend>
-                  {parkingOptions.length > 0 ? (
-                    <div className="mt-3 max-w-md">
-                      <Select
-                        label="Parking bay"
-                        value={parkingChoice}
-                        onChange={(event) => setParkingChoice(event.target.value)}
-                        options={[
-                          { value: 'none', label: 'No parking' },
-                          ...parkingOptions.map((bay) => ({
-                            value: bay.id,
-                            label: `${bay.code} · ${bay.bayType.toLowerCase()} · ${bay.areaName}`,
-                          })),
-                        ]}
-                      />
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-body-sm text-slate">
-                      No suitable bay is free. Attendance can still be recorded without parking.
-                    </p>
-                  )}
-                </fieldset>
-              ) : null}
-
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Button
-                  size="kiosk"
-                  loading={record.isPending}
-                  disabled={record.isPending}
-                  icon={direction === 'IN' ? <CheckIcon size={20} /> : <ArrowRightIcon size={20} />}
-                  onClick={() => record.mutate()}
-                  className="min-w-[220px]"
-                >
-                  {direction === 'IN'
-                    ? chosenBay
-                      ? `Mark IN & park ${chosenBay.code}`
-                      : 'Mark IN'
-                    : 'Mark OUT'}
-                </Button>
-                <button
-                  type="button"
-                  className="inline-flex min-h-12 items-center rounded-md px-3 text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
-                  onClick={() =>
-                    setDirectionOverride(direction === inferredDirection ? (direction === 'IN' ? 'OUT' : 'IN') : null)
-                  }
-                >
-                  {directionOverride
-                    ? `Use ${inferredDirection} instead`
-                    : `Change direction to ${direction === 'IN' ? 'OUT' : 'IN'}`}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex min-h-12 items-center rounded-md px-3 text-body-sm text-slate hover:text-ink"
-                  onClick={() => {
-                    setSelected(null);
-                    setQuery('');
-                    searchRef.current?.focus();
-                  }}
-                >
-                  Choose someone else
-                </button>
-              </div>
-
-              {formError ? (
-                <p role="alert" className="mt-4 rounded-md bg-error-surface px-3 py-2 text-body-sm text-error-ink">
-                  {formError}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link
-                to="/guests"
-                className="inline-flex min-h-12 items-center rounded-full-2 bg-monday-violet px-6 text-body-sm font-medium text-snow"
+          <fieldset className="mt-5 rounded-3xl bg-cloud p-4">
+            <legend className="px-1 text-body-sm font-medium text-ink">Event time</legend>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-body-sm text-slate">
+                {timeOverride
+                  ? 'Custom time will be used for this attendance event.'
+                  : 'The current time will be recorded.'}
+              </p>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center rounded-md px-2 text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
+                onClick={() => {
+                  if (!timeOverride) setEventTime(toLocalInputValue());
+                  setTimeOverride((current) => !current);
+                }}
               >
-                Open guest register
-              </Link>
-              <Link
-                to="/parking"
-                className="inline-flex min-h-12 items-center rounded-full-2 border border-slate px-6 text-body-sm font-medium text-ink"
-              >
-                Open parking board
-              </Link>
+                {timeOverride ? 'Use current time' : 'Change time'}
+              </button>
             </div>
-          )}
+            {timeOverride ? (
+              <div className="mt-3 max-w-xs">
+                <Input
+                  label="Time (Mauritius)"
+                  type="datetime-local"
+                  value={eventTime}
+                  max={toLocalInputValue()}
+                  onChange={(event) => setEventTime(event.target.value)}
+                />
+              </div>
+            ) : null}
+          </fieldset>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Button
+              size="kiosk"
+              loading={record.isPending}
+              disabled={record.isPending}
+              icon={direction === 'IN' ? <CheckIcon size={20} /> : <ArrowRightIcon size={20} />}
+              onClick={() => record.mutate()}
+              className="min-w-[220px]"
+            >
+              {direction === 'IN' ? 'Mark IN' : 'Mark OUT'}
+            </Button>
+            <button
+              type="button"
+              className="inline-flex min-h-12 items-center rounded-md px-3 text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
+              onClick={() =>
+                setDirectionOverride(direction === inferredDirection ? (direction === 'IN' ? 'OUT' : 'IN') : null)
+              }
+            >
+              {directionOverride
+                ? `Use ${inferredDirection} instead`
+                : `Change direction to ${direction === 'IN' ? 'OUT' : 'IN'}`}
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-12 items-center rounded-md px-3 text-body-sm text-slate hover:text-ink"
+              onClick={() => {
+                setSelected(null);
+                setQuery('');
+                setPickerQuery('');
+                searchRef.current?.focus();
+              }}
+            >
+              Choose someone else
+            </button>
+          </div>
+
+          {formError ? (
+            <p role="alert" className="mt-4 rounded-md bg-error-surface px-3 py-2 text-body-sm text-error-ink">
+              {formError}
+            </p>
+          ) : null}
         </Card>
       ) : null}
 
@@ -773,7 +595,7 @@ export function KioskPage() {
         ) : activity.data?.items.length === 0 ? (
           <EmptyState
             title="No one has been logged yet today."
-            description="Search for a staff member above to record the first entry or exit."
+            description="Search for an employee above to record the first entry or exit."
           />
         ) : (
           <Card className="p-0">
@@ -787,22 +609,9 @@ export function KioskPage() {
                   <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
                     {item.employeeName}
                   </span>
-                  <StatusPill tone={item.direction === 'IN' ? 'PRESENT' : 'INACTIVE'}>
+                  <StatusPill tone={item.direction === 'IN' ? 'ON_SITE' : 'INACTIVE'}>
                     {item.direction}
                   </StatusPill>
-                  <span className="hidden text-caption text-slate sm:inline">
-                    {item.recordedByName ? `by ${item.recordedByName}` : ''}
-                  </span>
-                  {item.canUndo ? (
-                    <button
-                      type="button"
-                      className="text-body-sm font-medium text-slate underline underline-offset-2 hover:text-ink"
-                      onClick={() => undo.mutate(item.id)}
-                      disabled={undo.isPending}
-                    >
-                      Undo
-                    </button>
-                  ) : null}
                 </li>
               ))}
             </ul>
@@ -813,63 +622,73 @@ export function KioskPage() {
       <Modal
         open={vehicleOpen}
         onClose={() => setVehicleOpen(false)}
-        title={`Add a vehicle for ${employee?.fullName ?? 'this employee'}`}
-        description="Security can register a vehicle during a gate check-in."
+        title="Add a vehicle"
+        description="A vehicle belongs to this employee. They may have more than one."
         footer={
           <>
             <Button variant="outlined" onClick={() => setVehicleOpen(false)}>
               Cancel
             </Button>
             <Button
+              type="submit"
+              form="kiosk-vehicle-form"
               loading={addVehicle.isPending}
               disabled={!vehicleForm.plate}
-              onClick={() => addVehicle.mutate()}
             >
               Add vehicle
             </Button>
           </>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <form
+          id="kiosk-vehicle-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            addVehicle.mutate();
+          }}
+        >
           <Input
             label="Plate"
             value={vehicleForm.plate}
             onChange={(event) => setVehicleForm({ ...vehicleForm, plate: event.target.value })}
-            error={vehicleFieldErrors.plate}
+            error={vehicleFieldErrors.plate?.[0]}
             required
           />
-          <Select
-            label="Vehicle type"
-            value={vehicleForm.vehicleType}
-            onChange={(event) =>
-              setVehicleForm({
-                ...vehicleForm,
-                vehicleType: event.target.value as typeof vehicleForm.vehicleType,
-              })
-            }
-            options={[
-              { value: 'car', label: 'Car' },
-              { value: 'motorbike', label: 'Motorbike' },
-              { value: 'van', label: 'Van' },
-              { value: 'other', label: 'Other' },
-            ]}
-          />
-          <Input
-            label="Make"
-            value={vehicleForm.make}
-            onChange={(event) => setVehicleForm({ ...vehicleForm, make: event.target.value })}
-          />
-          <Input
-            label="Model"
-            value={vehicleForm.model}
-            onChange={(event) => setVehicleForm({ ...vehicleForm, model: event.target.value })}
-          />
-          <Input
-            label="Colour"
-            value={vehicleForm.colour}
-            onChange={(event) => setVehicleForm({ ...vehicleForm, colour: event.target.value })}
-          />
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Make"
+              value={vehicleForm.make}
+              onChange={(event) => setVehicleForm({ ...vehicleForm, make: event.target.value })}
+            />
+            <Input
+              label="Model"
+              value={vehicleForm.model}
+              onChange={(event) => setVehicleForm({ ...vehicleForm, model: event.target.value })}
+            />
+            <Input
+              label="Colour"
+              value={vehicleForm.colour}
+              onChange={(event) => setVehicleForm({ ...vehicleForm, colour: event.target.value })}
+            />
+            <Select
+              label="Type"
+              value={vehicleForm.vehicleType}
+              onChange={(event) =>
+                setVehicleForm({
+                  ...vehicleForm,
+                  vehicleType: event.target.value as typeof vehicleForm.vehicleType,
+                })
+              }
+              options={[
+                { value: 'car', label: 'Car' },
+                { value: 'motorbike', label: 'Motorbike' },
+                { value: 'van', label: 'Van' },
+                { value: 'other', label: 'Other' },
+              ]}
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

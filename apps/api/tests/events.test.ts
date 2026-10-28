@@ -135,72 +135,6 @@ describe('P3 events, duplicate guard, attendance and kiosk', () => {
     expect(separatePerson.status).toBe(201);
   });
 
-  it('releases the employee’s active parking session when marked OUT', async () => {
-    const { employee, vehicle } = await seedPeople();
-    const securityUser = await createUser({
-      username: 'security',
-      password: 'StrongPassword123!',
-      role: 'SECURITY',
-    });
-    const security = new TestClient(app);
-    await security.login('security', 'StrongPassword123!');
-
-    const area = await prisma.parkingArea.create({
-      data: { name: 'Main Lot', code: 'MAIN', active: true },
-    });
-    const bay = await prisma.parkingBay.create({
-      data: { areaId: area.id, code: 'A-01', bayType: 'GENERAL', active: true },
-    });
-    const inAt = localTodayAt(8);
-    const outAt = localTodayAt(17);
-
-    await security.inject({
-      method: 'POST',
-      url: '/api/v1/events',
-      body: { employeeId: employee.id, direction: 'IN', occurredAt: inAt.toISOString() },
-    });
-    const parked = await prisma.parkingSession.create({
-      data: {
-        bayId: bay.id,
-        vehicleId: vehicle.id,
-        plateSnapshot: vehicle.plate,
-        holderNameSnapshot: 'Nadia Bossy',
-        holderCategory: 'employee',
-        startedAt: inAt,
-        allocatedBy: securityUser.id,
-      },
-    });
-
-    const markedOut = await security.inject<{
-      releasedSessions: Array<{ bayCode: string; sessionId: string; endedAt: string }>;
-    }>({
-      method: 'POST',
-      url: '/api/v1/events',
-      body: { employeeId: employee.id, direction: 'OUT', occurredAt: outAt.toISOString() },
-    });
-
-    expect(markedOut.status).toBe(201);
-    expect(markedOut.body.releasedSessions).toEqual([
-      expect.objectContaining({
-        bayCode: 'A-01',
-        sessionId: parked.id,
-        endedAt: outAt.toISOString(),
-      }),
-    ]);
-    const ended = await prisma.parkingSession.findUniqueOrThrow({ where: { id: parked.id } });
-    expect(ended.endedAt?.toISOString()).toBe(outAt.toISOString());
-    expect(ended.endedBy).toBe(securityUser.id);
-    expect(ended.endReason).toBe('gate_release');
-    expect(
-      await prisma.parkingSession.count({ where: { bayId: bay.id, endedAt: null } }),
-    ).toBe(0);
-    expect(
-      await prisma.auditLog.findFirst({
-        where: { action: 'parking.release', entityId: parked.id },
-      }),
-    ).not.toBeNull();
-  });
-
   it('undoes only the current user’s recent gate event', async () => {
     const { employee } = await seedPeople();
     const security = await client('SECURITY');
@@ -261,6 +195,17 @@ describe('P3 events, duplicate guard, attendance and kiosk', () => {
       url: '/api/v1/kiosk/search?q=Nadia%20Bossy',
     });
     expect(byFullName.body.employees).toHaveLength(1);
+
+    const options = await security.inject<{
+      employees: Array<{ id: string; fullName: string; vehicles: unknown[] }>;
+    }>({ url: '/api/v1/kiosk/employees' });
+    expect(options.status).toBe(200);
+    expect(options.body.employees[0]).toMatchObject({
+      id: employee.id,
+      fullName: 'Nadia Bossy',
+    });
+    expect(options.body.employees[0]?.vehicles).toHaveLength(1);
+    expect(byName.body).not.toHaveProperty('guests');
 
     const activity = await security.inject<{ onCampusCount: number; items: unknown[] }>({
       url: '/api/v1/kiosk/activity',

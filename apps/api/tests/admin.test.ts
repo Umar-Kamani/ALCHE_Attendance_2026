@@ -96,7 +96,7 @@ describe('P8 users, audit, on-campus and dean dashboard', () => {
     expect((await officer.inject({ url: '/api/v1/auth/me' })).status).toBe(401);
   });
 
-  it('exposes on-campus staff, guests and parking to both roles', async () => {
+  it('exposes on-campus employees and their vehicles to both roles', async () => {
     const employee = await prisma.employee.create({
       data: {
         code: 'ALCHE001',
@@ -107,19 +107,21 @@ describe('P8 users, audit, on-campus and dean dashboard', () => {
         active: true,
       },
     });
-    const guest = await prisma.guest.create({
-      data: { fullName: 'Élodie Tran', company: 'Telecom' },
-    });
-    await prisma.guestVisit.create({
-      data: {
-        guestId: guest.id,
-        hostEmployeeId: employee.id,
-        purpose: 'Meeting',
-        expectedFrom: new Date(Date.now() - 60 * 60_000),
-        expectedTo: new Date(Date.now() + 60 * 60_000),
-        checkedInAt: new Date(Date.now() - 30 * 60_000),
-        status: 'ON_SITE',
-      },
+    await prisma.vehicle.createMany({
+      data: [
+        {
+          plate: 'AB 1234',
+          plateNorm: 'AB1234',
+          vehicleType: 'car',
+          employeeId: employee.id,
+        },
+        {
+          plate: 'AB 5678',
+          plateNorm: 'AB5678',
+          vehicleType: 'car',
+          employeeId: employee.id,
+        },
+      ],
     });
     await prisma.event.create({
       data: {
@@ -130,50 +132,17 @@ describe('P8 users, audit, on-campus and dean dashboard', () => {
         source: 'gate',
       },
     });
-    const area = await prisma.parkingArea.create({
-      data: { name: 'Main Lot', code: 'MAIN', active: true },
-    });
-    const bay = await prisma.parkingBay.create({
-      data: { areaId: area.id, code: 'A-01', bayType: 'GENERAL', active: true },
-    });
-    await prisma.parkingBay.create({
-      data: { areaId: area.id, code: 'A-02', bayType: 'GENERAL', active: true },
-    });
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        plate: 'AB 1234',
-        plateNorm: 'AB1234',
-        vehicleType: 'car',
-        employeeId: employee.id,
-      },
-    });
-    await prisma.parkingSession.create({
-      data: {
-        bayId: bay.id,
-        vehicleId: vehicle.id,
-        plateSnapshot: vehicle.plate,
-        holderNameSnapshot: 'Nadia Bossy',
-        holderCategory: 'employee',
-        allocatedBy: hrUser.id,
-      },
-    });
 
     const response = await hr.inject<{
       employees: Array<{ fullName: string; vehicles: string[] }>;
-      guests: Array<{ guestName: string; hostName: string; overdue: boolean }>;
-      parking: { total: number; occupied: number; free: number };
     }>({ url: '/api/v1/on-campus' });
     expect(response.status).toBe(200);
     expect(response.body.employees[0]).toMatchObject({
       fullName: 'Nadia Bossy',
-      vehicles: ['AB 1234'],
+      vehicles: ['AB 1234', 'AB 5678'],
     });
-    expect(response.body.guests[0]).toMatchObject({
-      guestName: 'Élodie Tran',
-      hostName: 'Nadia Bossy',
-      overdue: false,
-    });
-    expect(response.body.parking).toMatchObject({ total: 2, occupied: 1, free: 1 });
+    expect(response.body).not.toHaveProperty('guests');
+    expect(response.body).not.toHaveProperty('parking');
   });
 
   it('serves aggregate-only dean stats and denies HR and security', async () => {

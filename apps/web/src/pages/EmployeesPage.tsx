@@ -215,7 +215,7 @@ export function EmployeesPage() {
       <div>
         <PageHeader
           title="Employees"
-          description="The staff directory behind attendance and parking. Deactivate people instead of deleting them."
+          description="The employee directory behind attendance and vehicles. Deactivate people instead of deleting them."
           actions={
             <>
               <Button variant="outlined" icon={<UploadIcon size={18} />} onClick={() => setImportOpen(true)}>

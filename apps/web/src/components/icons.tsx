@@ -124,23 +124,7 @@ export function CarIcon(props: IconProps) {
   );
 }
 
-export function ParkingIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />
-    </IconBase>
-  );
-}
 
-export function HistoryIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-      <path d="M3 3v5h5M12 7v5l3 2" />
-    </IconBase>
-  );
-}
 
 export function TicketIcon(props: IconProps) {
   return (
@@ -160,14 +144,6 @@ export function ShieldIcon(props: IconProps) {
   );
 }
 
-export function BuildingIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
-      <path d="M14 9h4a2 2 0 0 1 2 2v10M2 21h20M8 7h2M8 11h2M8 15h2M17 13h.01M17 17h.01" />
-    </IconBase>
-  );
-}
 
 export function FileIcon(props: IconProps) {
   return (

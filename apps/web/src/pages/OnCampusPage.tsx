@@ -6,10 +6,8 @@ import {
   Badge,
   Card,
   CardHeader,
-  EmptyState,
   ErrorState,
   PageHeader,
-  StatusPill,
   Table,
   TableSkeleton,
   TBody,
@@ -18,8 +16,8 @@ import {
   THead,
   TR,
 } from '../components/ui';
-import { ClockIcon, MapPinIcon } from '../components/icons';
-import { durationLabel, elapsedLabel, formatTime } from '../lib/dates';
+import { ClockIcon } from '../components/icons';
+import { elapsedLabel, formatTime } from '../lib/dates';
 
 export function OnCampusPage() {
   const query = useQuery<OnCampusResponse>({
@@ -29,10 +27,10 @@ export function OnCampusPage() {
   });
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-8">
       <PageHeader
         title="On campus now"
-        description="The screen to glance at when the gate phone rings. Read-only for both security and HR."
+        description="Employees whose latest effective event is IN. Read-only for security and HR."
       />
 
       {query.isLoading ? (
@@ -43,25 +41,12 @@ export function OnCampusPage() {
         <ErrorState title="The on-campus board could not load." onRetry={() => query.refetch()} />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Card className="p-5">
-              <p className="text-caption uppercase tracking-caption text-slate">Staff on campus</p>
+              <p className="text-caption uppercase tracking-caption text-slate">Employees on campus</p>
               <p className="mt-1 text-heading-sm font-medium text-ink">
                 {query.data?.employees.length ?? 0}
               </p>
-            </Card>
-            <Card className="p-5">
-              <p className="text-caption uppercase tracking-caption text-slate">Guests on site</p>
-              <p className="mt-1 text-heading-sm font-medium text-ink">
-                {query.data?.guests.length ?? 0}
-              </p>
-            </Card>
-            <Card className="p-5">
-              <p className="text-caption uppercase tracking-caption text-slate">Bays occupied</p>
-              <p className="mt-1 text-heading-sm font-medium text-ink">
-                {query.data?.parking.occupied ?? 0} / {query.data?.parking.total ?? 0}
-              </p>
-              <p className="text-body-sm text-slate">{query.data?.parking.free ?? 0} free</p>
             </Card>
             <Card className="p-5">
               <p className="text-caption uppercase tracking-caption text-slate">Last refreshed</p>
@@ -74,11 +59,11 @@ export function OnCampusPage() {
 
           <Card>
             <CardHeader
-              title="Staff on campus"
+              title="Employees on campus"
               description="Latest effective event is IN. Time is local Mauritius time."
             />
             {query.data?.employees.length === 0 ? (
-              <p className="text-body-sm text-slate">No staff are currently on campus.</p>
+              <p className="text-body-sm text-slate">No employees are currently on campus.</p>
             ) : (
               <Table tableClassName="min-w-[560px]">
                 <THead>
@@ -117,57 +102,6 @@ export function OnCampusPage() {
                           </div>
                         ) : (
                           '—'
-                        )}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader title="Guests on site" description="Host and expected departure are shown." />
-            {query.data?.guests.length === 0 ? (
-              <p className="text-body-sm text-slate">No guests are currently checked in.</p>
-            ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Guest</TH>
-                    <TH>Host</TH>
-                    <TH>Checked in</TH>
-                    <TH>Expected out</TH>
-                    <TH>Badge</TH>
-                    <TH>Status</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {query.data?.guests.map((guest) => (
-                    <TR key={guest.visitId}>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={guest.guestName} size="sm" />
-                          <span>
-                            <span className="block font-medium text-ink">{guest.guestName}</span>
-                            <span className="block text-caption text-slate">
-                              {guest.company ?? '—'}
-                            </span>
-                          </span>
-                        </div>
-                      </TD>
-                      <TD>
-                        {guest.hostName}
-                        <span className="block text-caption text-slate">{guest.hostDepartment}</span>
-                      </TD>
-                      <TD>{formatTime(guest.since)}</TD>
-                      <TD>{formatTime(guest.expectedTo)}</TD>
-                      <TD>{guest.badgeNo ?? '—'}</TD>
-                      <TD>
-                        {guest.overdue ? (
-                          <StatusPill tone="OVERDUE">OVERDUE</StatusPill>
-                        ) : (
-                          <StatusPill tone="ON_SITE">ON SITE</StatusPill>
                         )}
                       </TD>
                     </TR>

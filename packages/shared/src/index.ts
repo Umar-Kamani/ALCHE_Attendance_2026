@@ -3,7 +3,6 @@ export * from './common.js';
 export * from './auth.js';
 export * from './people.js';
 export * from './attendance.js';
-export * from './parking.js';
-export * from './guests.js';
+export * from './vehicles.js';
 export * from './tickets.js';
 export * from './admin.js';

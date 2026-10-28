@@ -3,33 +3,16 @@ import { login, readDownload } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
-test('security marks IN with parking, HR applies the amendment and exports, security handles a guest vehicle', async ({
-  page,
-}) => {
-  const guestName = `E2E Guest ${Date.now().toString().slice(-6)}`;
-  const plate = `E2E ${Date.now().toString().slice(-4)}`;
-
+test('security marks IN, HR applies the amendment and exports attendance', async ({ page }) => {
   await login(page, 'e2e.security');
 
-  // --- Gate: mark IN with inline parking -----------------------------------
   await page.goto('/kiosk');
-  await page.getByRole('combobox').fill('Mohammad Sookun');
-  const mohammad = page.getByRole('option', { name: /Mohammad Sookun/ });
-  await expect(mohammad).toBeVisible();
-  await mohammad.click();
+  await page.getByRole('combobox', { name: 'Search employees and vehicles' }).fill('Mohammad Sookun');
+  await page.getByRole('option', { name: /Mohammad Sookun/ }).click();
+  await page.getByRole('button', { name: 'Mark IN' }).click();
+  await expect(page.getByText('Mohammad Sookun marked IN')).toBeVisible();
+  await expect(page.getByText('On campus since')).toBeVisible();
 
-  const markIn = page.getByRole('button', { name: /Mark IN & park/ });
-  await expect(markIn).toBeVisible();
-  const markInLabel = (await markIn.textContent()) ?? '';
-  const bayCode = /park\s+([A-Z]-\d+)/.exec(markInLabel)?.[1];
-  expect(bayCode).toBeTruthy();
-  await markIn.click();
-
-  await expect(page.getByText('Mohammad Sookun is on campus')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Mark OUT/ })).toBeVisible();
-  await expect(page.getByText(`Parked in ${bayCode}`)).toBeVisible();
-
-  // --- Raise amendment ticket ---------------------------------------------
   await page.goto('/tickets');
   await page.getByRole('button', { name: 'Raise ticket' }).first().click();
   const ticketDialog = page.getByRole('dialog');
@@ -41,7 +24,6 @@ test('security marks IN with parking, HR applies the amendment and exports, secu
   await expect(ticketDialog).toBeHidden();
   await expect(page.locator('tbody tr', { hasText: 'Mohammad Sookun' }).first()).toBeVisible();
 
-  // --- HR approves and applies, then exports ------------------------------
   await page.context().clearCookies();
   await login(page, 'e2e.hr');
   await page.goto('/tickets');
@@ -68,91 +50,28 @@ test('security marks IN with parking, HR applies the amendment and exports, secu
     'date,employee_code,first_name,last_name,department,category,status,first_in,last_out,span_hours,net_hours,visits,flags,amended,first_in_iso,last_out_iso',
   );
   expect(download.suggestedFilename()).toMatch(/^attendance_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.csv$/);
-
-  // --- Security: guest with a vehicle, parking, checkout ------------------
-  await page.context().clearCookies();
-  await login(page, 'e2e.security');
-  await page.goto('/guests');
-  await page.getByRole('button', { name: 'Check in walk-in' }).click();
-  const visitDialog = page.getByRole('dialog');
-  await visitDialog.getByRole('button', { name: 'New guest' }).click();
-  await visitDialog.getByLabel(/Full name/).fill(guestName);
-  await visitDialog.getByLabel('Company').fill('E2E Company');
-  await visitDialog.getByLabel('Phone').fill('+230 5999 0000');
-  await visitDialog.getByLabel('ID / passport').fill('E2E-ID-0001');
-  await visitDialog.getByLabel(/Host employee/).fill('Nadia Bossy');
-  await visitDialog.getByRole('button', { name: /Nadia Bossy/ }).first().click();
-  await visitDialog.getByLabel(/Purpose/).fill('E2E supplier meeting');
-  await visitDialog.getByLabel('Badge number').fill('E2E-B1');
-  await visitDialog.getByLabel('Guest arrives with a vehicle').check();
-  await visitDialog.getByLabel(/^Plate/).fill(plate);
-  await visitDialog.getByLabel('Make').fill('Toyota');
-  await visitDialog.getByLabel('Model').fill('Corolla');
-  await visitDialog.getByLabel('Colour').fill('White');
-  await visitDialog.getByRole('button', { name: 'Check in now' }).click();
-  await expect(visitDialog).toBeHidden();
-  const guestRow = page.locator('tbody tr', { hasText: guestName }).first();
-  await expect(guestRow).toBeVisible();
-  await expect(guestRow.getByText('ON SITE', { exact: true })).toBeVisible();
-
-  await page.goto('/parking');
-  await page.getByLabel('Area').selectOption({ label: 'Admin Front' });
-  const guestBay = page.getByLabel('B-03, Guest bay, free');
-  await expect(guestBay).toBeVisible();
-  await guestBay.click();
-  const allocationDialog = page.getByRole('dialog');
-  await allocationDialog.getByLabel(/Find vehicle or holder/).fill(plate);
-  await allocationDialog.getByRole('button', { name: new RegExp(plate) }).first().click();
-  await allocationDialog.getByRole('button', { name: 'Allocate' }).click();
-  await expect(page.getByText('Bay allocated')).toBeVisible();
-  await expect(page.getByLabel('B-03, Guest bay, occupied')).toBeVisible();
-
-  await page.goto('/guests');
-  await page.reload();
-  const checkedInRow = page.locator('tbody tr', { hasText: guestName }).first();
-  await expect(checkedInRow.getByText('B-03')).toBeVisible();
-  await checkedInRow.getByRole('button', { name: 'Check out' }).click();
-  const checkoutDialog = page.getByRole('dialog');
-  await expect(checkoutDialog.getByLabel(/Release bay B-03/)).toBeChecked();
-  await checkoutDialog.getByRole('button', { name: 'Check out' }).click();
-  await expect(page.getByText('Guest checked out')).toBeVisible();
-  await expect(
-    page.locator('tbody tr', { hasText: guestName }).first().getByText('DEPARTED', { exact: true }),
-  ).toBeVisible();
-
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
-  const guestExportPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export CSV' }).click();
-  const guestDownload = await guestExportPromise;
-  const guestCsv = (await readDownload(await guestDownload.path())).toString('utf8');
-  expect(guestCsv.replace(/^\uFEFF/, '').split('\r\n')[0]).toBe(
-    'date_in,time_in,date_out,time_out,guest_name,company,phone,id_number,host_employee,host_department,purpose,badge_no,vehicle_plate,status',
-  );
-  expect(guestCsv).toContain(guestName);
-  expect(guestCsv).toContain(plate);
-  expect(guestCsv).toContain('DEPARTED');
 });
 
 test('keeps focus in an add-record dialog while typing', async ({ page }) => {
-  await login(page, 'e2e.security');
-  await page.goto('/guests');
-  await page.getByRole('button', { name: 'Check in walk-in' }).click();
+  await login(page, 'e2e.hr');
+  await page.goto('/employees');
+  await page.getByRole('button', { name: 'Add employee' }).click();
 
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'New guest' }).click();
-  const fullName = dialog.getByLabel(/Full name/);
-  await fullName.click();
-  await fullName.pressSequentially('Vera Visual', { delay: 10 });
+  const firstName = dialog.getByLabel('First name');
+  await firstName.click();
+  await firstName.pressSequentially('Vera Visual', { delay: 10 });
 
-  await expect(fullName).toHaveValue('Vera Visual');
-  await expect(fullName).toBeFocused();
+  await expect(firstName).toHaveValue('Vera Visual');
+  await expect(firstName).toBeFocused();
 });
 
-test('marks in with a chosen bay and time, then releases it on OUT', async ({ page }) => {
+test('selects an employee from the dropdown, records custom time and marks OUT', async ({ page }) => {
   await login(page, 'e2e.security');
   await page.goto('/kiosk');
-  await page.getByRole('combobox').fill('Vera Visual');
-  await page.getByRole('option', { name: /Vera Visual/ }).click();
+
+  await page.getByRole('combobox', { name: 'Select employee' }).click();
+  await page.getByRole('option', { name: /Vera Visual/ }).first().click();
 
   await page.getByRole('button', { name: 'Change time' }).click();
   const localTime = await page.evaluate(() => {
@@ -174,20 +93,34 @@ test('marks in with a chosen bay and time, then releases it on OUT', async ({ pa
   });
   await page.getByLabel('Time (Mauritius)').fill(localTime);
 
-  const parking = page.getByLabel('Parking bay');
-  await parking.selectOption({ index: 1 });
-  const selectedBay = (await parking.locator('option:checked').textContent()) ?? '';
-  const [bayCode, bayType, areaName] = selectedBay.split(' · ');
-  if (!bayCode || !bayType || !areaName) throw new Error(`Unexpected parking option: ${selectedBay}`);
-
-  await page.getByRole('button', { name: `Mark IN & park ${bayCode}` }).click();
-  await expect(page.getByText(`Parked in ${bayCode}, ${areaName}.`)).toBeVisible();
+  await page.getByRole('button', { name: 'Mark IN' }).click();
+  await expect(page.getByText('Vera Visual marked IN')).toBeVisible();
+  await expect(page.getByText('On campus since')).toBeVisible();
 
   await page.getByRole('button', { name: 'Mark OUT' }).click();
-  await expect(page.getByText(`Released ${bayCode}.`)).toBeVisible();
+  await expect(page.getByText('Vera Visual marked OUT')).toBeVisible();
+  await expect(page.getByText('Off campus, last left')).toBeVisible();
+});
 
-  await page.goto('/parking');
-  await page.getByLabel('Area').selectOption({ label: areaName });
-  const typeLabel = bayType!.charAt(0).toUpperCase() + bayType!.slice(1);
-  await expect(page.getByLabel(`${bayCode}, ${typeLabel} bay, free`)).toBeVisible();
+test('assigns multiple vehicles to the same employee', async ({ page }) => {
+  await login(page, 'e2e.security');
+  await page.goto('/vehicles');
+
+  const suffix = Date.now().toString().slice(-6);
+  const plates = [`E2E ${suffix}A`, `E2E ${suffix}B`];
+
+  for (const plate of plates) {
+    await page.getByRole('button', { name: 'Add vehicle' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Find employee').fill('Vera Visual');
+    await dialog.getByRole('button', { name: /Vera Visual/ }).first().click();
+    await dialog.getByLabel('Plate').fill(plate);
+    await dialog.getByRole('button', { name: 'Add vehicle' }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  for (const plate of plates) {
+    await page.getByLabel('Search').fill(plate);
+    await expect(page.locator('tbody tr', { hasText: plate }).first()).toBeVisible();
+  }
 });

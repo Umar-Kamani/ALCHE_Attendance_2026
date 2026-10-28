@@ -52,7 +52,7 @@ export function DashboardPage() {
     <div className="space-y-16">
       <PageHeader
         title="Campus dashboard"
-        description="Aggregate operational statistics. This read-only view contains no individual names or guest personal data."
+        description="Aggregate employee attendance statistics. This read-only view contains no individual names or personal data."
         actions={
           <Button
             variant="outlined"
@@ -155,55 +155,6 @@ export function DashboardPage() {
                 <p className="mt-1 text-heading-sm font-medium text-ink">
                   {hoursLabel(query.data.month.averageSpanHours)}
                 </p>
-              </Card>
-            </div>
-          </section>
-
-          <section aria-labelledby="guests-parking">
-            <h2 id="guests-parking" className="mb-3 text-subheading font-medium text-ink">
-              Guests and parking
-            </h2>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Card>
-                <CardHeader title="Guests" description="Today’s operational guest flow." />
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    ['Expected today', query.data.guests.expectedToday],
-                    ['On site now', query.data.guests.onSiteNow],
-                    ['Overdue now', query.data.guests.overdueNow],
-                    ['Departed today', query.data.guests.departedToday],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-md bg-cloud p-3">
-                      <p className="text-caption uppercase tracking-caption text-slate">{label}</p>
-                      <p className="mt-1 text-subheading font-medium text-ink">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card>
-                <CardHeader
-                  title="Parking occupancy"
-                  description={`${query.data.parking.occupied} of ${query.data.parking.total} active bays occupied.`}
-                />
-                <div className="space-y-3">
-                  {Object.entries(query.data.parking.byType).map(([type, value]) => (
-                    <div key={type}>
-                      <div className="mb-1 flex items-center justify-between text-body-sm">
-                        <span className="text-ink">{type}</span>
-                        <span className="text-slate">
-                          {value.occupied}/{value.total} occupied · {value.free} free
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full-2 bg-shadow-dust">
-                        <div
-                          className="h-full rounded-full-2 bg-monday-violet"
-                          style={{ width: `${value.total ? (value.occupied / value.total) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </Card>
             </div>
           </section>

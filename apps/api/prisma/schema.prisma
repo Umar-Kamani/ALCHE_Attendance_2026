@@ -25,10 +25,6 @@ model User {
   sessions        Session[]
   eventsRecorded  Event[]         @relation("RecordedEvents")
   eventsVoided    Event[]         @relation("VoidedEvents")
-  visitsCheckedIn GuestVisit[]    @relation("VisitCheckedInBy")
-  visitsCheckedOut GuestVisit[]   @relation("VisitCheckedOutBy")
-  sessionsAllocated ParkingSession[] @relation("SessionAllocatedBy")
-  sessionsEnded   ParkingSession[] @relation("SessionEndedBy")
   ticketsRaised   Ticket[]        @relation("TicketRaisedBy")
   ticketsReviewed Ticket[]        @relation("TicketReviewedBy")
   importBatches   ImportBatch[]
@@ -69,58 +65,11 @@ model Employee {
 
   importBatch ImportBatch?  @relation(fields: [importBatchId], references: [id], onDelete: Restrict)
   events      Event[]
-  guestVisits GuestVisit[]
   vehicles    Vehicle[]
   tickets     Ticket[]
 
   @@index([department])
   @@index([active])
-}
-
-model Guest {
-  id        String   @id @default(uuid()) @db.Uuid
-  fullName  String
-  phone     String?
-  idNumber  String?
-  company   String?
-  email     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-
-  visits   GuestVisit[]
-  vehicles Vehicle[]
-
-  @@index([active])
-}
-
-model GuestVisit {
-  id             String    @id @default(uuid()) @db.Uuid
-  guestId        String    @db.Uuid
-  hostEmployeeId String    @db.Uuid
-  vehicleId      String?   @db.Uuid
-  purpose        String
-  expectedFrom   DateTime  @db.Timestamptz(3)
-  expectedTo     DateTime  @db.Timestamptz(3)
-  badgeNo        String?
-  checkedInAt    DateTime? @db.Timestamptz(3)
-  checkedInBy    String?   @db.Uuid
-  checkedOutAt   DateTime? @db.Timestamptz(3)
-  checkedOutBy   String?   @db.Uuid
-  status         String    @default("EXPECTED")
-  note           String?
-  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
-
-  guest        Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  hostEmployee Employee  @relation(fields: [hostEmployeeId], references: [id], onDelete: Restrict)
-  vehicle      Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  checkedInUser  User?   @relation("VisitCheckedInBy", fields: [checkedInBy], references: [id], onDelete: Restrict)
-  checkedOutUser User?   @relation("VisitCheckedOutBy", fields: [checkedOutBy], references: [id], onDelete: Restrict)
-
-  @@index([status, expectedFrom])
-  @@index([guestId])
-  @@index([hostEmployeeId])
 }
 
 model Vehicle {
@@ -133,76 +82,14 @@ model Vehicle {
   vehicleType String   @default("car")
   active      Boolean  @default(true)
   notes       String?
-  employeeId  String?  @db.Uuid
-  guestId     String?  @db.Uuid
+  employeeId  String   @db.Uuid
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Restrict)
-
-  sessions    ParkingSession[]
-  guestVisits GuestVisit[]
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
 
   @@index([plateNorm])
   @@index([employeeId])
-  @@index([guestId])
-}
-
-model ParkingArea {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  code      String   @unique @db.Citext
-  active    Boolean  @default(true)
-  notes     String?
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-
-  bays ParkingBay[]
-}
-
-model ParkingBay {
-  id        String   @id @default(uuid()) @db.Uuid
-  areaId    String   @db.Uuid
-  code      String
-  bayType   String
-  active    Boolean  @default(true)
-  notes     String?
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-
-  area     ParkingArea      @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  sessions ParkingSession[]
-
-  @@unique([areaId, code])
-  @@index([areaId, bayType])
-}
-
-model ParkingSession {
-  id                 String    @id @default(uuid()) @db.Uuid
-  bayId              String    @db.Uuid
-  vehicleId          String?   @db.Uuid
-  plateSnapshot      String
-  holderNameSnapshot String
-  holderCategory     String
-  startedAt          DateTime  @default(now()) @db.Timestamptz(3)
-  endedAt            DateTime? @db.Timestamptz(3)
-  allocatedBy        String    @db.Uuid
-  endedBy            String?   @db.Uuid
-  endReason          String?
-  overrideReason     String?
-  note               String?
-  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
-
-  bay        ParkingBay @relation(fields: [bayId], references: [id], onDelete: Restrict)
-  vehicle    Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  allocatedUser User    @relation("SessionAllocatedBy", fields: [allocatedBy], references: [id], onDelete: Restrict)
-  endedUser  User?      @relation("SessionEndedBy", fields: [endedBy], references: [id], onDelete: Restrict)
-
-  @@index([bayId, endedAt])
-  @@index([vehicleId, endedAt])
-  @@index([startedAt, endedAt])
 }
 
 model Event {

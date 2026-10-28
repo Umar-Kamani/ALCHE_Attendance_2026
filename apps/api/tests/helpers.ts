@@ -8,13 +8,8 @@ const TABLES = [
   'ImportBatch',
   'Ticket',
   'Event',
-  'ParkingSession',
-  'GuestVisit',
   'Vehicle',
-  'ParkingBay',
-  'ParkingArea',
   'Employee',
-  'Guest',
   'Session',
   'User',
 ];

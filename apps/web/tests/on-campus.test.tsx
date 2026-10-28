@@ -24,8 +24,6 @@ const response: OnCampusResponse = {
       vehicles: ['AB 1234'],
     },
   ],
-  guests: [],
-  parking: { occupied: 1, total: 10, free: 9 },
 };
 
 describe('on-campus staff table', () => {
